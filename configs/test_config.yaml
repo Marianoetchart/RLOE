@@ -1,0 +1,19 @@
+# data config
+orderbook_file_path: "/Users/mahmoud/_code/_air/lobmod/data/INTC_2015-01-01_2015-01-31_10/INTC_2015-01-02_34200000_57600000_orderbook_10.csv"
+orders_file_path: "/Users/mahmoud/_code/_air/lobmod/data/INTC_2015-01-01_2015-01-31_10/INTC_2015-01-05_34200000_57600000_message_10.csv"
+
+# client order information
+instrument: "INTC"
+date: "2015-01-02"
+frequency: "1s"
+direction: "BUY"
+quantity: 10000
+duration: 120
+benchmark: "arrival"
+
+# simulation config
+seed: 5422608
+log_dir: "/Users/mahmoud/_code/gymlob/logs"
+
+num_train_episodes: 1000
+num_test_episodes: 100
