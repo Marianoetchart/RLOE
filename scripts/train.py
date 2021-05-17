@@ -49,7 +49,8 @@ def run(seed: int,
     set_seed(environment=env, seed=seed)
 
     agent = AGENT_MAPPING.get(cfg.algo.agent_type)(env, cfg)
-    set_wandb(cfg)
+    if cfg.log_wb:
+        set_wandb(cfg)
     agent.train()
 
 

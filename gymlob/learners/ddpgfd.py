@@ -7,8 +7,8 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_
 
-from prism.agents.ddpg import DDPGLearner
-from prism.learners.learner import TensorTuple
+from gymlob.agents.ddpg import DDPGLearner
+from gymlob.learners.learner import TensorTuple
 
 
 class DDPGfDLearner(DDPGLearner):

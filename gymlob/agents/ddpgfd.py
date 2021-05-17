@@ -5,7 +5,7 @@ import logging as log
 import gym
 import numpy as np
 import omegaconf
-import pickle5 as pickle
+import pickle
 import torch
 import wandb
 

@@ -84,7 +84,6 @@ class DDPGAgent(Agent):
             
             self.episode_step = 0
             episode_reward = 0
-            losses = list()
             done = False
             state = self.env.reset()
             
@@ -100,8 +99,7 @@ class DDPGAgent(Agent):
                     for _ in range(self.hyper_params.multiple_update):
                         experience = self.memory.sample()
                         experience = numpy2floattensor(experience, self.learner.device)
-                        loss = self.learner.update_model(experience)
-                        losses.append(loss)  # for logging
+                        self.learner.update_model(experience)
 
                 state = next_state
                 episode_reward += step_reward
@@ -111,8 +109,6 @@ class DDPGAgent(Agent):
 
             if self.cfg.log_wb or self.cfg.log_cmd:
                 time_remaining, quantity_remaining, _, _ = state
-                if losses:
-                    avg_loss = np.vstack(losses).mean(axis=0)
                 if self.cfg.log_wb:
                     wandb.log(
                         {
@@ -121,21 +117,15 @@ class DDPGAgent(Agent):
                             "reward": episode_reward,
                             "time remaining": time_remaining,
                             "quantity remaining": quantity_remaining,
-
                             "total num steps": self.total_step,
-                            "actor avg loss": avg_loss[0],
-                            "critic avg loss": avg_loss[1],
-                            "total avg loss": avg_loss.sum(),
                             "avg time per step": avg_time_cost
                         }
                     )
-                losses.clear()
 
             if self.i_episode % self.cfg.save_params_every == 0:
                 self.learner.save_params(self.i_episode)
 
         # termination
-        self.env.close()
         self.learner.save_params(self.i_episode)
 
     def test(self):

@@ -27,8 +27,7 @@ class Learner(ABC):
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         if not self.cfg.test:
-            self.ckpt_path = f"'../../../../../checkpoint/{self.cfg.project_name}/{self.cfg.algo.env}/" \
-                             f"{self.cfg.algo.seed}/{self.cfg.experiment_name}"
+            self.ckpt_path = f"'../../../../../checkpoint/{self.cfg.project_name}/{self.cfg.experiment_name}"
             os.makedirs(self.ckpt_path, exist_ok=True)
 
     @abstractmethod

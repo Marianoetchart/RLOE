@@ -11,8 +11,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
 
-from prism.learners.learner import Learner, TensorTuple
-from prism.utils.nn.neural_network import NeuralNetwork
+from gymlob.learners.learner import Learner, TensorTuple
+from gymlob.utils.nn.neural_network import NeuralNetwork
 
 
 class DQNLearner(Learner):

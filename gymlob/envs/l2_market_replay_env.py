@@ -89,7 +89,6 @@ class L2MarketReplayEnv(gym.Env):
         """
 
         """
-
         done = False
 
         current_ob_snapshot = self.episode_orderbook_df.loc[self.current_time]
@@ -148,7 +147,6 @@ class L2MarketReplayEnv(gym.Env):
                 continue
 
         executed_orders = [(int(order[0]), order[1]) for order in executed_orders]
-        assert sum([order[0] for order in executed_orders]) == size
         return executed_orders
 
     def render(self, mode='human'):

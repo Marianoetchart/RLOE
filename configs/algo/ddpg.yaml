@@ -7,7 +7,7 @@ hyper_params:
   tau: 0.005
   buffer_size: 10000
   batch_size: 64
-  initial_random_action: 1000 #10000
+  initial_random_action: 5000 #10000
   multiple_update: 1
   gradient_clip_ac: 0.5
   gradient_clip_cr: 1.0
