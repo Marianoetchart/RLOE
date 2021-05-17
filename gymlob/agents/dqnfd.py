@@ -1,6 +1,5 @@
 import pickle
 import time
-import typing
 
 import gym
 import omegaconf
@@ -14,7 +13,7 @@ from gymlob.utils.replay_buffer import ReplayBuffer, PrioritizedBufferWrapper, g
 class DQNfDAgent(DQNAgent):
 
     def __init__(self,
-                 env: typing.Union[gym.Env, str],
+                 env: gym.Env,
                  cfg: omegaconf.dictconfig.DictConfig
                  ):
 

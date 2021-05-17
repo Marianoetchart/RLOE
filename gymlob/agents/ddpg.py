@@ -18,7 +18,7 @@ from gymlob.utils.utils import numpy2floattensor
 class DDPGAgent(Agent):
 
     def __init__(self,
-                 env: typing.Union[gym.Env, str],
+                 env: gym.Env,
                  cfg: omegaconf.dictconfig.DictConfig
                  ):
 
@@ -36,7 +36,7 @@ class DDPGAgent(Agent):
                              sigma=self.learner_cfg.noise_cfg.ou_noise_sigma)
 
         self.current_state = np.zeros((1,))
-        
+
         self.episode_step = 0
         self.i_episode = 0
 
@@ -45,13 +45,13 @@ class DDPGAgent(Agent):
                       ) -> np.ndarray:
 
         self.current_state = state
-        state = numpy2floattensor(state, self.learner.device)
 
         # if initial random action should be conducted
         if self.total_step < self.hyper_params.initial_random_action and not self.cfg.test:
             return np.array(self.action_space.sample())
         else:
             with torch.no_grad():
+                state = numpy2floattensor(state, self.learner.device)
                 selected_action = self.learner.actor(state).detach().cpu().numpy()
 
             if not self.cfg.test:
@@ -67,8 +67,7 @@ class DDPGAgent(Agent):
         next_state, reward, done, info = self.env.step(action)
 
         if not self.cfg.test:
-            done_bool = False if self.episode_step == self.cfg.max_episode_steps else done
-            transition = (self.current_state, action, reward, next_state, done_bool)
+            transition = (self.current_state, action, reward, next_state, done)
             self.memory.add(transition)
 
         return next_state, reward, done, info
@@ -81,12 +80,12 @@ class DDPGAgent(Agent):
         for self.i_episode in range(1, self.cfg.num_train_episodes + 1):
 
             t_begin = time.time()
-            
+
             self.episode_step = 0
             episode_reward = 0
             done = False
             state = self.env.reset()
-            
+
             while not done:
 
                 action = self.select_action(state)
@@ -118,7 +117,8 @@ class DDPGAgent(Agent):
                             "time remaining": time_remaining,
                             "quantity remaining": quantity_remaining,
                             "total num steps": self.total_step,
-                            "avg time per step": avg_time_cost
+                            "avg time per step": avg_time_cost,
+                            "time per episode": t_end - t_begin
                         }
                     )
 

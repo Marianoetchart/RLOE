@@ -15,7 +15,7 @@ from gymlob.envs.l2_market_replay_env import L2MarketReplayEnv
 from gymlob.utils.utils import set_seed
 from gymlob.utils.logging import set_wandb
 
-CONFIG_NAME = ROOT_DIR + "configs/ddpg_agent.yaml"
+CONFIG_NAME = ROOT_DIR + "configs/execution_agent.yaml"
 CONFIG_PATH = ROOT_DIR + 'configs/'
 
 
@@ -44,13 +44,13 @@ def run(seed: int,
                             },
                             orderbook_file_path=cfg.orderbook_file_path,
                             orders_file_path=cfg.orders_file_path,
+                            discrete_action_space=True if cfg.algo.agent_type == "DQN" else False,
                             _seed=seed)
 
     set_seed(environment=env, seed=seed)
 
     agent = AGENT_MAPPING.get(cfg.algo.agent_type)(env, cfg)
-    if cfg.log_wb:
-        set_wandb(cfg)
+    if cfg.log_wb: set_wandb(cfg)
     agent.train()
 
 

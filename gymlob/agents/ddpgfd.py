@@ -19,7 +19,7 @@ from gymlob.utils.utils import numpy2floattensor
 class DDPGfDAgent(DDPGAgent):
 
     def __init__(self,
-                 env: typing.Union[gym.Env, str],
+                 env: gym.Env,
                  cfg: omegaconf.dictconfig.DictConfig
                  ):
 

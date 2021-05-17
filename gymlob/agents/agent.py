@@ -13,7 +13,7 @@ import torch
 class Agent(abc.ABC):
 
     def __init__(self,
-                 env: typing.Union[gym.Env, str],
+                 env: gym.Env,
                  cfg: omegaconf.dictconfig.DictConfig
                  ):
         self.env = env

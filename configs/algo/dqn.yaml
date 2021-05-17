@@ -7,7 +7,7 @@ hyper_params:
   tau: 0.005
   buffer_size: 100000         # openai baselines: 10000
   batch_size: 64              # openai baselines: 32
-  update_starts_from: 10000   # openai baselines: 10000
+  update_starts_from: 5000   # openai baselines: 10000
   multiple_update: 1          # multiple learning updates
   train_freq: 1               # in openai baselines, train_freq = 4
   gradient_clip: 10.0         # dueling: 10.0

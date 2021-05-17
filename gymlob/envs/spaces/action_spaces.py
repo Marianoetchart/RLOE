@@ -1,9 +1,13 @@
 import numpy as np
 from collections import OrderedDict
-from gym.spaces import Dict, Box
+from gym.spaces import Dict, Box, Discrete
 
 
-def get_action_space(client_order_info):
+def get_discrete_action_space(client_order_info):
+    return Discrete(n=client_order_info['quantity'])
+
+
+def get_continuous_action_space(client_order_info):
     return Dict(OrderedDict(
         {
             #    "order_type": Discrete(n=1),

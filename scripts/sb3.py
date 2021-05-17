@@ -29,6 +29,7 @@ def main(cfg: DictConfig):
                                                "benchmark": cfg.benchmark},
                             orderbook_file_path=cfg.orderbook_file_path,
                             orders_file_path=cfg.orders_file_path,
+                            discrete_action_space=True,
                             _seed=cfg.seed)
 
     agent = SB3Agent(env=env, cfg=cfg)

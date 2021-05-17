@@ -1,15 +1,10 @@
 project_name: "GYMLOB"
-experiment_name: "DDPG_TRAIN"
 
 seeds: [5422608]
 log_cmd: False
 log_wb: True
-save_params_every: 100 # in episodes
-num_experiments_in_parallel: 1
 test: False
-
-num_train_episodes: 20000
-max_episode_steps: 120
+num_experiments_in_parallel: 1
 
 # data config
 orderbook_file_path: "/efs/mm/lobrep/data/TSLA_2015-01-01_2015-01-31_10/TSLA_2015-01-02_34200000_57600000_orderbook_10.csv"
@@ -27,5 +22,8 @@ quantity: 1000
 duration: 120
 benchmark: "arrival"
 
+num_train_episodes: 20000
+save_params_every: 100 # in episodes
+
 defaults:
-  - algo: ddpg
+  - algo: dqn
