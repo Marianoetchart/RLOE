@@ -3,8 +3,10 @@ from stable_baselines3 import A2C, DDPG, DQN, HER, PPO, SAC, TD3
 
 from omegaconf.dictconfig import DictConfig
 
+from gymlob.agents.agent import Agent
 
-class SB3Agent:
+
+class SB3Agent(Agent):
 
     def __init__(self,
                  env: Env,

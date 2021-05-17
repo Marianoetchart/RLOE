@@ -7,4 +7,3 @@ scikit-learn
 gym
 stable-baselines
 torch
-tensorboardX
