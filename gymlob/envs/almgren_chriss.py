@@ -1,8 +1,13 @@
 import random
 import numpy as np
+import pandas as pd
 import collections
 
 import gym
+from gymlob.envs.spaces.observation_spaces import get_observation_space
+from gymlob.envs.spaces.action_spaces import get_discrete_action_space, get_continuous_action_space
+from gym.spaces.utils import flatten_space, flatten
+from gymlob.utils.data.lobster import LOBSTERDataLoader
 
 # ------------------------------------------------ Financial Parameters --------------------------------------------- #
 
@@ -30,19 +35,58 @@ GAMMA = BID_ASK_SP / (0.1 * DAILY_TRADE_VOL)  # Permanent Impact Constant
 class AlmgrenChrissEnv(gym.Env):
 
     def __init__(self,
+                 instrument: str,
+                 date: str,
+                 frequency: str,
+                 num_levels: int,
+                 client_order_info: dict,
+                 orderbook_file_path: str, 
+                 orders_file_path: str,
+                 discrete_action_space: False,
                  randomSeed=0,
                  lqd_time=LIQUIDATION_TIME,
                  num_tr=NUM_N,
-                 lambd=LLAMBDA):
+                 lambd=LLAMBDA, 
+                ):
 
         # Set the random seed
-        random.seed(randomSeed)
+        self._seed = randomSeed
+        super().seed(self._seed)
+        self.random_state = np.random.RandomState(seed=self._seed)
+
+        # Initialize lobster variables
+        self.instrument = instrument
+        self.date = date
+        self.frequency = frequency
+        self.num_levels = num_levels
+
+        self.loader = LOBSTERDataLoader(instrument=instrument,
+                                        date=date,
+                                        frequency=frequency,
+                                        num_levels=num_levels,
+                                        orders_file_path=orders_file_path,
+                                        orderbook_file_path=orderbook_file_path)
+        self.full_orderbook_df = self.loader.orderbook_df
+        self.episode_orderbook_df = self.full_orderbook_df
 
         # Initialize the financial parameters so we can access them later
         self.anv = ANNUAL_VOLAT
         self.basp = BID_ASK_SP
         self.dtv = DAILY_TRADE_VOL
         self.dpv = DAILY_VOLAT
+
+        self.timestamps = self.full_orderbook_df.index
+        self.start_time = self.timestamps[0]
+        self.end_time = self.timestamps[1]
+        self.current_time = self.start_time
+
+        #initialize state space and action space
+        self.client_order_info = client_order_info
+        self.observation_space = flatten_space(get_observation_space(self.client_order_info))
+        if discrete_action_space:
+            self.action_space = get_discrete_action_space(self.client_order_info)
+        else:
+            self.action_space = flatten_space(get_continuous_action_space(self.client_order_info))
 
         # Initialize the Almgren-Chriss parameters so we can access them later
         self.total_shares = TOTAL_SHARES
@@ -75,15 +119,49 @@ class AlmgrenChrissEnv(gym.Env):
         # Set a variable to keep trak of the trade number
         self.k = 0
 
-    def reset(self, seed=0, liquid_time=LIQUIDATION_TIME, num_trades=NUM_N, lamb=LLAMBDA):
+    def reset(self, seed=0, liquid_time=LIQUIDATION_TIME, num_trades=NUM_N, lamb=LLAMBDA, total_shares = TOTAL_SHARES):
 
-        # Initialize the environment with the given parameters
-        self.__init__(randomSeed=seed, lqd_time=liquid_time, num_tr=num_trades, lambd=lamb)
+        # # Initialize the environment with the given parameters
+        #self.__init__(randomSeed=seed, lqd_time=liquid_time, num_tr=num_trades, lambd=lamb)
 
-        # Set the initial state to [0,0,0,0,0,0,1,1]
-        self.initial_state = np.array(list(self.logReturns) + [self.timeHorizon / self.num_n, \
-                                                               self.shares_remaining / self.total_shares])
-        return self.initial_state
+        # # Set the initial state to [0,0,0,0,0,0,1,1]
+        # self.initial_state = np.array(list(self.logReturns) + [self.timeHorizon / self.num_n, \
+        #                                                        self.shares_remaining / self.total_shares])
+        # return self.initial_state
+
+        # Set the variables for the initial state
+        self.shares_remaining = self.total_shares
+        self.timeHorizon = num_trades
+        self.logReturns = collections.deque(np.zeros(6))
+
+
+        allowed_timestamps = pd.date_range(start=self.timestamps[0],
+                                            end=self.timestamps[-1] - np.timedelta64(self.client_order_info['duration'], 'm'),
+                                            freq=self.frequency)
+
+        self.start_time = self.random_state.choice(allowed_timestamps)
+        self.end_time = self.start_time + np.timedelta64(self.client_order_info['duration'], 'm')
+
+        self.episode_orderbook_df = self.full_orderbook_df.loc[self.start_time:self.end_time]
+
+        self.current_time = self.start_time
+        self.time_remaining = self.client_order_info['duration']
+        self.quantity_remaining = self.client_order_info['quantity']
+
+        self.executed_orders = []
+        self.step_num = 1
+
+        return flatten(space=get_observation_space(self.client_order_info),
+                    x=collections.OrderedDict(
+                        {
+                            "time_remaining": self.time_remaining,
+                            "quantity_remaining": self.quantity_remaining,
+                            "spread": self.episode_orderbook_df.iloc[0]['spread'],
+                            "order_volume_imbalance": self.episode_orderbook_df.iloc[0]['order_volume_imbalance']
+                        }
+                    ))
+
+
 
     def start_transactions(self):
 
@@ -147,9 +225,9 @@ class AlmgrenChrissEnv(gym.Env):
             if isinstance(action, np.ndarray):
                 action = action.item()
 
-                # Convert the action to the number of shares to sell in the current step
+            # Convert the action to the number of shares to sell in the current step
             sharesToSellNow = self.shares_remaining * action
-            #             sharesToSellNow = min(self.shares_remaining * action, self.shares_remaining)
+            # sharesToSellNow = min(self.shares_remaining * action, self.shares_remaining)
 
             if self.timeHorizon < 2:
                 sharesToSellNow = self.shares_remaining
@@ -174,6 +252,9 @@ class AlmgrenChrissEnv(gym.Env):
             # Update the number of shares remaining
             self.shares_remaining -= info.share_to_sell_now
 
+            # Update current time
+            self.current_time += np.timedelta64(int(self.frequency[:-1]), self.frequency[-1])
+
             # Calculate the runnig total of the squares of shares sold and shares remaining
             self.totalSSSQ += info.share_to_sell_now ** 2
             self.totalSRSQ += self.shares_remaining ** 2
@@ -186,6 +267,10 @@ class AlmgrenChrissEnv(gym.Env):
             # Calculate the reward
             currentUtility = self.compute_AC_utility(self.shares_remaining)
             reward = (abs(self.prevUtility) - abs(currentUtility)) / abs(self.prevUtility)
+
+            if type(reward) !=  np.float64:
+                print('Error')
+
             self.prevUtility = currentUtility
 
             # If all the shares have been sold calculate E, V, and U, and give a positive reward.
@@ -201,10 +286,21 @@ class AlmgrenChrissEnv(gym.Env):
         self.k += 1
 
         # Set the new state
-        state = np.array(
-            list(self.logReturns) + [self.timeHorizon / self.num_n, self.shares_remaining / self.total_shares])
+        # state = np.array(
+        #     list(self.logReturns) + [self.timeHorizon / self.num_n, self.shares_remaining / self.total_shares])
 
-        return (state, np.array([reward]), info.done, info)
+        observation = flatten(
+            space=get_observation_space(self.client_order_info),
+            x=collections.OrderedDict(
+                {
+                    "time_remaining": self.timeHorizon,
+                    "quantity_remaining": self.shares_remaining,
+                    "spread": self.episode_orderbook_df.loc[self.current_time]['spread'],
+                    "order_volume_imbalance": self.episode_orderbook_df.loc[self.current_time]['order_volume_imbalance']
+                })
+        )
+
+        return (observation , np.array([reward]), info.done, info)
 
     def permanentImpact(self, sharesToSell):
         # Calculate the permanent impact according to equations (6) and (1) of the AC paper
