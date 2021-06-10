@@ -1,13 +1,12 @@
 # LimitOrder class, inherits from Order class, adds a limit price.  These are the
 # Orders that typically go in an Exchange's OrderBook.
 
-from gymlob.simulator.util.order.Order import Order
-from gymlob.simulator.util.util import fmtTime
-
-from gymlob.simulator.agent.FinancialAgent import dollarize
+import sys
 from copy import deepcopy
 
-import sys
+from gymlob.simulator.agent.FinancialAgent import dollarize
+from gymlob.simulator.util.order.Order import Order
+from gymlob.simulator.util.util import fmtTime
 
 # Module level variable that can be changed by config files.
 silent_mode = False
@@ -70,3 +69,12 @@ class LimitOrder(Order):
         order.fill_price = fill_price
 
         return order
+
+    def obj(self):
+        return {
+            "time_placed": fmtTime(self.time_placed),
+            "order_id": self.order_id,
+            "is_buy_order": self.is_buy_order,
+            "limit_price": self.limit_price,
+            "quantity": self.quantity
+        }

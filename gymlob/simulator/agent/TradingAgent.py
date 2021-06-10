@@ -220,6 +220,11 @@ class TradingAgent(FinancialAgent):
 
             self.querySpread(msg.body['symbol'], msg.body['data'], msg.body['bids'], msg.body['asks'], msg.body['book'])
 
+        elif msg.body['msg'] == 'QUERY_ORDERBOOK':
+            if msg.body['mkt_closed']: self.mkt_closed = True
+
+            self.queryOrderbook(msg.body['symbol'], msg.body['bids'], msg.body['asks'])
+
         elif msg.body['msg'] == 'QUERY_ORDER_STREAM':
             # Call the queryOrderStream method, which subclasses may extend.
             # Also note if the market is closed.
@@ -259,6 +264,10 @@ class TradingAgent(FinancialAgent):
     def getCurrentSpread(self, symbol, depth=1):
         self.sendMessage(self.exchangeID, Message({"msg": "QUERY_SPREAD", "sender": self.id,
                                                    "symbol": symbol, "depth": depth}))
+
+    def getOrderBook(self, symbol):
+        self.sendMessage(self.exchangeID, Message({"msg": "QUERY_ORDERBOOK", "sender": self.id,
+                                                   "symbol": symbol}))
 
     # Used by any Trading Agent subclass to query the recent order stream for a symbol.
     def getOrderStream(self, symbol, length=1):
@@ -485,6 +494,11 @@ class TradingAgent(FinancialAgent):
         self.logEvent("IMBALANCE", [sum([x[1] for x in bids]), sum([x[1] for x in asks])])
 
         self.book = book
+
+    def queryOrderbook(self, symbol, bids, asks):
+        self.known_bids[symbol] = bids
+        self.known_asks[symbol] = asks
+        return bids, asks
 
     def handleMarketData(self, msg):
         '''

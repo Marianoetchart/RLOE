@@ -121,10 +121,10 @@ def get_lobster_marketreplay_config(security, date, start_time=None, end_time=No
                                  random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32)))])
 
     # 2) LOBSTER Market Replay Agent
-    orderbook_file_path = f'/efs/abides-mrrl/data/LOBSTER/{security}_2015-01-01_2015-01-31_10/' \
-                          f'{security}_{date[:4]}-{date[4:6]}-{date[6:]}_34200000_57600000_orderbook_10.csv'
-    message_file_path = f'/efs/abides-mrrl/data/LOBSTER/{security}_2015-01-01_2015-01-31_10/' \
-                        f'{security}_{date[:4]}-{date[4:6]}-{date[6:]}_34200000_57600000_message_10.csv'
+    orderbook_file_path = f'/efs/mm/lobrep/data/{security}_2015-01-01_2015-01-31_10/' \
+                          f'{security}_{date}_34200000_57600000_orderbook_10.csv'
+    message_file_path = f'/efs/mm/lobrep/data/{security}_2015-01-01_2015-01-31_10/' \
+                        f'{security}_{date}_34200000_57600000_message_10.csv'
 
     agents.extend([LOBSTERMarketReplayAgent(id=1,
                                             name="LOBSTER_MARKET_REPLAY_AGENT",

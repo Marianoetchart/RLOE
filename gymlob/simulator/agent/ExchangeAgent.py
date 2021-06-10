@@ -102,6 +102,13 @@ class ExchangeAgent(FinancialAgent):
                                                           "mkt_closed": True if currentTime > self.mkt_close else False,
                                                           "book": ''}))
 
+        elif msg.body['msg'] == "QUERY_ORDERBOOK":
+            symbol = msg.body['symbol']
+            self.sendMessage(msg.body['sender'], Message({"msg": "QUERY_ORDERBOOK", "symbol": symbol,
+                                                          "bids": self.order_books[symbol].bids,
+                                                          "asks": self.order_books[symbol].asks,
+                                                          "mkt_closed": True if currentTime > self.mkt_close else False}))
+
         elif msg.body['msg'] == "QUERY_ORDER_STREAM":
             symbol = msg.body['symbol']
             length = msg.body['length']

@@ -20,6 +20,7 @@ class LOBSTERMarketReplayAgent(TradingAgent):
                                      date=date,
                                      orderbook_file_path=orderbook_file_path,
                                      message_file_path=message_file_path)
+        self.orderbook_queues_df = pd.DataFrame(columns=['timestamp', 'bids', 'asks'])
 
     def kernelStarting(self, startTime):
         super().kernelStarting(startTime)
@@ -27,26 +28,53 @@ class LOBSTERMarketReplayAgent(TradingAgent):
     def kernelStopping(self):
         super().kernelStopping()
 
+    def kernelTerminating(self):
+        super().kernelTerminating()
+        self.writeLog(self.orderbook_queues_df, filename='orderbook_queues_df')
+
     def wakeup(self, currentTime):
         try:
             super().wakeup(currentTime)
             if not self.mkt_open or not self.mkt_close:
                 return
+            self.getOrderBook(self.symbol)
+
             order = self.data.trades_df.loc[self.data.trades_df.timestamp == currentTime]
             wake_up_time = self.data.trades_df.loc[self.data.trades_df.timestamp > currentTime].iloc[0].timestamp
             if currentTime == self.data.orderbook_df.iloc[0].name:
-                self.placeMktOpenOrders(order, t=currentTime)
+                if len(order) == 1:
+                    self.placeMktOpenOrders(order, t=currentTime)
+                else:
+                    for _, ind_order in order.iterrows():
+                        self.placeMktOpenOrders(pd.DataFrame(ind_order).T, t=currentTime)
             elif (currentTime > self.mkt_open) and (currentTime < self.mkt_close):
                 try:
                     self.placeOrder(currentTime, order)
                 except Exception as e:
                     log_print(e)
             self.setWakeup(wake_up_time)
+
+            self.orderbook_queues_df = self.orderbook_queues_df.append(pd.Series(data={
+                "timestamp": currentTime,
+                "bids": self.extract_orderbook_queue(self.known_bids[self.symbol]),
+                "asks": self.extract_orderbook_queue(self.known_asks[self.symbol])
+            }), ignore_index=True)
+
         except Exception as e:
             print(str(e))
 
     def receiveMessage(self, currentTime, msg):
         super().receiveMessage(currentTime, msg)
+
+    def extract_orderbook_queue(self, book):
+        orders = {}
+        orders_in_price_level = []
+        for price_level in range(0, len(book)):
+            for order in book[price_level]:
+                orders_in_price_level.append(order.obj())
+            orders[price_level] = orders_in_price_level
+            orders_in_price_level = []
+        return orders
 
     def placeMktOpenOrders(self, snapshot_order, t=0):
         orders_snapshot = self.data.orderbook_df.loc[self.data.orderbook_df.index == t].T
@@ -173,8 +201,8 @@ class LOBSTERProcessor:
         return orderbook_df
 
     def filter_trades(self):
-        log_print("Original trades type counts:")
-        log_print(str(self.message_df.type.value_counts()))
+        #log_print("Original trades type counts:")
+        #log_print(str(self.message_df.type.value_counts()))
         trades_df = self.message_df.loc[
             self.message_df.type.isin(['NEW', 'CANCELLATION', 'PARTIAL_CANCELLATION', 'EXECUTE_VISIBLE'])]
         order_id_types_series = trades_df.groupby('order_id')['type'].apply(list)
@@ -183,6 +211,6 @@ class LOBSTERProcessor:
         part_cancel_only_order_ids = list(
             order_id_types_series[order_id_types_series == "['PARTIAL_CANCELLATION']"].index)
         trades_df = trades_df.loc[~trades_df.order_id.isin(cancel_only_order_ids + part_cancel_only_order_ids)]
-        log_print("Filtered trades type counts:")
-        log_print(str(trades_df.type.value_counts()))
+        #log_print("Filtered trades type counts:")
+        #log_print(str(trades_df.type.value_counts()))
         return trades_df

@@ -43,11 +43,16 @@ class Kernel:
 
         self.currentTime = self.startTime
 
+        ttl_messages = 0
+
         while not self.messages.empty() and self.currentTime and (self.currentTime <= self.stopTime):
 
             self.currentTime, event = self.messages.get()
 
             msg_recipient, msg_type, msg = event
+
+            if ttl_messages % 100000 == 0:
+                print("\n--- Simulation time: {}, messages processed: {} ---\n".format(self.currentTime, ttl_messages))
 
             agent = msg_recipient
 
@@ -56,6 +61,8 @@ class Kernel:
                 continue
 
             self.agentCurrentTimes[agent] = self.currentTime
+
+            ttl_messages += 1
 
             if msg_type == MessageType.WAKEUP:
                 agents[agent].wakeup(self.currentTime)

@@ -17,7 +17,7 @@ def abides(name: str,
     kernel = Kernel(name, log_folder=log_folder+name, skip_log=skip_log,
                     random_state=np.random.RandomState(seed=np.random.randint(low=0, high=2 ** 32)))
 
-    start_time = datetime.strptime(date, '%Y%m%d')
+    start_time = datetime.strptime(date, '%Y-%m-%d')
     stop_time = stop_time + timedelta(minutes=5)
 
     custom_state = kernel.runner(agents=agents, startTime=start_time, stopTime=stop_time)
