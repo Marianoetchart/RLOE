@@ -126,6 +126,9 @@ class DQNLearner(Learner):
         loss_for_prior = dq_loss_element_wise.detach().cpu().numpy()
         new_priorities = loss_for_prior + self.hyper_params.per_eps
 
+        if np.isnan(new_priorities).any(): 
+            new_priorities = np.nan_to_num(new_priorities, nan = 0.00000000000000001)
+
         if self.learner_cfg.head.configs.use_noisy_net:
             self.dqn.head.reset_noise()
             self.dqn_target.head.reset_noise()

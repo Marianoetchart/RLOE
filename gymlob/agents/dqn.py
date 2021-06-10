@@ -65,6 +65,9 @@ class DQNAgent(Agent):
 
         next_state, reward, done, info = self.env.step(action)
 
+        if np.isnan(reward).any():
+            print('Error')
+
         if not self.cfg.test:
             transition = (self.current_state, action, reward, next_state, done)
 
@@ -146,7 +149,8 @@ class DQNAgent(Agent):
                             "quantity remaining": quantity_remaining,
                             "total num steps": self.total_step,
                             "avg time per step": avg_time_cost,
-                            "time per episode": t_end - t_begin
+                            "time per episode": t_end - t_begin,
+                            "implementation shortfall" :  _
                         }
                     )
 

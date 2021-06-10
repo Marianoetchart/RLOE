@@ -336,6 +336,10 @@ class PrioritizedBufferWrapper(BufferWrapper):
             a = segment * i
             b = segment * (i + 1)
             upperbound = random.uniform(a, b)
+
+            if type(upperbound) == np.nan:
+                print('Error')
+
             idx = self.sum_tree.retrieve(upperbound)
             if idx > len(self.buffer):
                 print(
