@@ -1,5 +1,5 @@
-#ROOT_DIR = '/efs/mm/gymlob/'
-ROOT_DIR = '/mnt/c/Users/Mariano/Documents/VSCode Projects/gymlob/'
+ROOT_DIR = '/efs/mm/gymlob/'
+#ROOT_DIR = '/mnt/c/Users/Mariano/Documents/VSCode Projects/gymlob/'
 
 import sys
 import os

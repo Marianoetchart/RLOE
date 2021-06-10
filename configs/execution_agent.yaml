@@ -7,15 +7,12 @@ test: False
 num_experiments_in_parallel: 1
 
 # data config
-orderbook_file_path: "/mnt/c/Users/Mariano/Documents/VSCode Projects/gymlob/TSLA_2015-01-05_34200000_57600000_orderbook_10.csv"
-#orderbook_file_path: "/Users/mahmoud/_code/_air/lobmod/data/TSLA_2015-01-01_2015-01-31_10/TSLA_2015-01-02_34200000_57600000_orderbook_10.csv"
-
-orders_file_path: "/mnt/c/Users/Mariano/Documents/VSCode Projects/gymlob/TSLA_2015-01-05_34200000_57600000_message_10.csv"
-#orders_file_path: "/Users/mahmoud/_code/_air/lobmod/data/TSLA_2015-01-01_2015-01-31_10/TSLA_2015-01-05_34200000_57600000_message_10.csv"
+orderbook_file_path: "/efs/mm/lobrep/data/TSLA_2015-01-01_2015-01-31_10/TSLA_2015-01-05_34200000_57600000_orderbook_10.csv"
+orders_file_path: "/efs/mm/lobrep/data/TSLA_2015-01-01_2015-01-31_10/TSLA_2015-01-05_34200000_57600000_message_10.csv"
 
 # client order information
 instrument: "TSLA"
-date: "2015-01-02"
+date: "2015-01-05"
 frequency: "1s"
 direction: "BUY"
 quantity: 1000
