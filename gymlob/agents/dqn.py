@@ -108,7 +108,7 @@ class DQNAgent(Agent):
             while not done:
 
                 action = self.select_action(state)
-                next_state, reward, done, _ = self.step(action)
+                next_state, reward, done, state_info = self.step(action)
 
                 self.total_step += 1
                 self.episode_step += 1
@@ -150,7 +150,7 @@ class DQNAgent(Agent):
                             "total num steps": self.total_step,
                             "avg time per step": avg_time_cost,
                             "time per episode": t_end - t_begin,
-                            "implementation shortfall" :  _
+                            "implementation shortfall" :  state_info.implementation_shortfall
                         }
                     )
 

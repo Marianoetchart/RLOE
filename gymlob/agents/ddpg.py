@@ -89,7 +89,7 @@ class DDPGAgent(Agent):
             while not done:
 
                 action = self.select_action(state)
-                next_state, step_reward, done, _ = self.step(action)
+                next_state, step_reward, done, state_info = self.step(action)
 
                 self.total_step += 1
                 self.episode_step += 1
@@ -118,7 +118,8 @@ class DDPGAgent(Agent):
                             "quantity remaining": quantity_remaining,
                             "total num steps": self.total_step,
                             "avg time per step": avg_time_cost,
-                            "time per episode": t_end - t_begin
+                            "time per episode": t_end - t_begin, 
+                            "implementation shortfall" :  state_info.implementation_shortfall
                         }
                     )
 
