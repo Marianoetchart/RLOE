@@ -81,6 +81,7 @@ class AlmgrenChrissEnv(gym.Env):
         self.current_time = self.start_time
 
         #initialize state space and action space
+        self.discrete_action_space = discrete_action_space
         self.client_order_info = client_order_info
         self.observation_space = flatten_space(get_observation_space(self.client_order_info))
         if discrete_action_space:
@@ -109,6 +110,7 @@ class AlmgrenChrissEnv(gym.Env):
         self.shares_remaining = self.total_shares
         self.timeHorizon = self.num_n
         self.logReturns = collections.deque(np.zeros(6))
+        self.executed_orders = []
 
         # Set the initial impacted price to the starting price
         self.prevImpactedPrice = self.startingPrice
@@ -226,8 +228,20 @@ class AlmgrenChrissEnv(gym.Env):
                 action = action.item()
 
             # Convert the action to the number of shares to sell in the current step
-            sharesToSellNow = self.shares_remaining * action
+            # sharesToSellNow = self.shares_remaining * action
             # sharesToSellNow = min(self.shares_remaining * action, self.shares_remaining)
+            
+            current_ob_snapshot = self.episode_orderbook_df.loc[self.current_time]
+
+            size = action  #size = int(action[0]) if not self.discrete_action_space else action
+
+            step_executed_orders = self.handle_market_order(direction=self.client_order_info['direction'],
+                                                            size=size,
+                                                            orderbook_snapshot=current_ob_snapshot)
+
+            self.executed_orders.append(step_executed_orders)
+
+            sharesToSellNow =  int(sum([order[0] for order in step_executed_orders])) 
 
             if self.timeHorizon < 2:
                 sharesToSellNow = self.shares_remaining
@@ -359,6 +373,28 @@ class AlmgrenChrissEnv(gym.Env):
             trade_list[i - 1] = st
         trade_list *= ft
         return trade_list
+
+
+    def handle_market_order(self, direction, size, orderbook_snapshot):
+
+            remaining_quantity = size
+            book = 'ask' if direction == 'BUY' else 'bid'
+
+            executed_orders = []
+            for level in range(1, self.num_levels + 1):
+                level_quantity = int(orderbook_snapshot[f'{book}_size_{level}'])
+                level_price = orderbook_snapshot[f'{book}_price_{level}']
+                if remaining_quantity <= level_quantity:
+                    executed_orders.append((remaining_quantity, level_price))
+                    break
+                else:
+                    executed_orders.append((level_quantity, level_price))
+                    remaining_quantity -= level_quantity
+                    continue
+
+            executed_orders = [(int(order[0]), order[1]) for order in executed_orders]
+            return executed_orders
+
 
     def observation_space_dimension(self):
         # Return the dimension of the state
