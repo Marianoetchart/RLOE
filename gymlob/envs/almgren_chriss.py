@@ -153,6 +153,8 @@ class AlmgrenChrissEnv(gym.Env):
         self.executed_orders = []
         self.step_num = 1
 
+        self.start_transactions()
+
         return flatten(space=get_observation_space(self.client_order_info),
                     x=collections.OrderedDict(
                         {
