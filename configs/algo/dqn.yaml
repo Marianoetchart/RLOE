@@ -6,8 +6,8 @@ hyper_params:
   gamma: 0.99
   tau: 0.005
   buffer_size: 100000         # openai baselines: 10000
-  batch_size: 64              # openai baselines: 32
-  update_starts_from: 5000   # openai baselines: 10000
+  batch_size: 64          # openai baselines: 32
+  update_starts_from: 5000  # openai baselines: 10000
   multiple_update: 1          # multiple learning updates
   train_freq: 1               # in openai baselines, train_freq = 4
   gradient_clip: 10.0         # dueling: 10.0
@@ -23,7 +23,13 @@ hyper_params:
 
 learner_cfg:
   backbone:
-  head:
+    type: "CNN"
+    configs: 
+      input_sizes: [4, 32, 64]
+      output_sizes: [32, 64, 64]
+      kernel_sizes: [8, 4, 3]
+      stride_sizes: [4, 2, 1]
+  head: 
     type: "MLP"
     configs:
       hidden_sizes: [128, 64]

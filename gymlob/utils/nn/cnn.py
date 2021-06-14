@@ -51,7 +51,7 @@ class CNN(nn.Module):
                  configs: omegaconf.dictconfig.DictConfig):
         super(CNN, self).__init__()
 
-        cnn_layers = list(map(CNNLayer, *configs.values()))
+        cnn_layers = list(map(CNNLayer, *list(configs.values())))
         self.cnn = nn.Sequential()
         for i, cnn_layer in enumerate(cnn_layers):
             self.cnn.add_module("cnn_{}".format(i), cnn_layer)
