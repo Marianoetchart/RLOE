@@ -57,6 +57,8 @@ class NeuralNetwork(nn.Module):
 
     def calculate_fc_input_size(self, state_dim: tuple):
         """Calculate fc input size according to the shape of cnn."""
+        if type(state_dim) == omegaconf.listconfig.ListConfig:
+            state_dim = tuple(state_dim)
         x = torch.zeros(state_dim).unsqueeze(0)
         output = self.backbone(x).detach().view(-1)
         return output.shape[0]
