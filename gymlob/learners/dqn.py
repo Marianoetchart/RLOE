@@ -13,7 +13,7 @@ from torch.nn.utils import clip_grad_norm_
 
 from gymlob.learners.learner import Learner, TensorTuple
 from gymlob.utils.nn.neural_network import NeuralNetwork
-
+from gymlob.utils.utils import add_widxheight_dim
 
 class DQNLearner(Learner):
 
@@ -147,9 +147,6 @@ class DQNLearner(Learner):
 
 class DQNLoss:
 
-    def add_1x1_dim(self, x):
-        return x.unsqueeze(2).unsqueeze(3)
-
     def __call__(
         self,
         model: NeuralNetwork,
@@ -160,13 +157,13 @@ class DQNLoss:
         """Return element-wise dqn loss and Q-values."""
         states, actions, rewards, next_states, dones = experiences[:5]
 
-        q_values = model(self.add_1x1_dim(states))
+        q_values = model(add_widxheight_dim(states))
         # According to noisynet paper,
         # it resamples noisynet parameters on online network when using double q
         # but we don't because there is no remarkable difference in performance.
-        next_q_values = model(self.add_1x1_dim(next_states))
+        next_q_values = model(add_widxheight_dim(next_states))
 
-        next_target_q_values = target_model(self.add_1x1_dim(next_states))
+        next_target_q_values = target_model(add_widxheight_dim(next_states))
 
         curr_q_value = q_values.gather(1, actions.long().unsqueeze(1))
         next_q_value = next_target_q_values.gather(1, next_q_values.argmax(1).unsqueeze(1))

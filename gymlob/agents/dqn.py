@@ -11,7 +11,7 @@ from gymlob.agents.agent import Agent
 from gymlob.learners.dqn import DQNLearner
 
 from gymlob.utils.replay_buffer import ReplayBuffer, PrioritizedBufferWrapper
-from gymlob.utils.utils import numpy2floattensor
+from gymlob.utils.utils import numpy2floattensor, add_widxheight_dim
 
 
 class DQNAgent(Agent):
@@ -55,7 +55,7 @@ class DQNAgent(Agent):
         else:
             with torch.no_grad():
                 state = numpy2floattensor(state, self.learner.device)
-                selected_action = self.learner.dqn(state).argmax()
+                selected_action = self.learner.dqn(add_widxheight_dim(state)).argmax()
             selected_action = selected_action.detach().cpu().numpy()
         return selected_action
 

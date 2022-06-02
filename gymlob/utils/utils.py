@@ -43,6 +43,12 @@ def numpy2floattensor(
     tensor = torch.from_numpy(arrays.copy()).to(device_, non_blocking=True).float()
     return tensor
 
+def add_widxheight_dim(x):
+    """ Adds the width and height dimension when dealing with 1d data and needing to do 2D convs """
+    if x.dim() == 1:
+        return x.unsqueeze(1).unsqueeze(2)
+    return x.unsqueeze(2).unsqueeze(3)
+
 
 class ActionNormalizer(gym.ActionWrapper):
     """Rescale and relocate the actions."""
