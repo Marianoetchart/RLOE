@@ -108,7 +108,7 @@ class AlmgrenChrissEnv(gym.Env):
 
         # Set the variables for the initial state
         self.shares_remaining = self.total_shares
-        self.timeHorizon = self.num_n
+        self.time_remaining = self.client_order_info['duration']
         self.logReturns = collections.deque(np.zeros(6))
         self.executed_orders = []
 
@@ -133,7 +133,6 @@ class AlmgrenChrissEnv(gym.Env):
 
         # Set the variables for the initial state
         self.shares_remaining = self.total_shares
-        self.timeHorizon = num_trades
         self.logReturns = collections.deque(np.zeros(6))
 
 
@@ -205,7 +204,7 @@ class AlmgrenChrissEnv(gym.Env):
         # number of trades or if the total number shares remaining is less than 1, then stop transacting,
         # set the done Flag to True, return the current implementation shortfall, and give a negative reward.
         # The negative reward is given in the else statement below.
-        if self.transacting and (self.timeHorizon == 0 or abs(self.shares_remaining) < self.tolerance):
+        if self.transacting and (self.time_remaining == 0 or abs(self.shares_remaining) < self.tolerance):
             self.transacting = False
             info.done = True
             info.implementation_shortfall = self.total_shares * self.startingPrice - self.totalCapture
@@ -245,7 +244,7 @@ class AlmgrenChrissEnv(gym.Env):
 
             sharesToSellNow =  int(sum([order[0] for order in step_executed_orders])) 
 
-            if self.timeHorizon < 2:
+            if self.time_remaining < 2:
                 sharesToSellNow = self.shares_remaining
 
             # Since we are not selling fractions of shares, round up the total number of shares to sell to the nearest integer.
@@ -276,7 +275,7 @@ class AlmgrenChrissEnv(gym.Env):
             self.totalSRSQ += self.shares_remaining ** 2
 
             # Update the variables required for the next step
-            self.timeHorizon -= 1
+            self.time_remaining -= 1
             self.prevPrice = info.price
             self.prevImpactedPrice = info.price - info.currentPermanentImpact
 
@@ -309,7 +308,7 @@ class AlmgrenChrissEnv(gym.Env):
             space=get_observation_space(self.client_order_info),
             x=collections.OrderedDict(
                 {
-                    "time_remaining": self.timeHorizon,
+                    "time_remaining": self.time_remaining,
                     "quantity_remaining": self.shares_remaining,
                     "spread": self.episode_orderbook_df.loc[self.current_time]['spread'],
                     "order_volume_imbalance": self.episode_orderbook_df.loc[self.current_time]['order_volume_imbalance']

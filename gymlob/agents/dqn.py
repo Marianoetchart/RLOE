@@ -113,7 +113,7 @@ class DQNAgent(Agent):
                 self.total_step += 1
                 self.episode_step += 1
 
-                if len(self.memory) >= self.hyper_params.update_starts_from:
+                if len(self.memory_n) >= self.hyper_params.update_starts_from:
                     if self.total_step % self.hyper_params.train_freq == 0:
                         for _ in range(self.hyper_params.multiple_update):
                             experience = self.sample_experience()
@@ -137,6 +137,12 @@ class DQNAgent(Agent):
             t_end = time.time()
             avg_time_cost = (t_end - t_begin) / self.episode_step
 
+            #check memory metrics
+            t = torch.cuda.get_device_properties(0).total_memory
+            r = torch.cuda.memory_reserved(0)
+            a = torch.cuda.memory_allocated(0)
+            f = r-a 
+
             if self.cfg.log_wb or self.cfg.log_cmd:
                 time_remaining, quantity_remaining, _, _ = state
                 if self.cfg.log_wb:
@@ -150,7 +156,12 @@ class DQNAgent(Agent):
                             "total num steps": self.total_step,
                             "avg time per step": avg_time_cost,
                             "time per episode": t_end - t_begin,
-                            "implementation shortfall" :  state_info.implementation_shortfall
+                            "implementation shortfall" :  state_info.implementation_shortfall,
+                            "permanent impact" :  state_info.currentPermanentImpact,
+                            "temporary impact" :  state_info.currentTemporaryImpact,
+                            "memory size": len(self.memory_n),
+                            "cuda free memory": f,
+                            "cuda total memory": t
                         }
                     )
 
