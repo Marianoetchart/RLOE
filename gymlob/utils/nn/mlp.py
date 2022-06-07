@@ -81,7 +81,7 @@ class MLP(nn.Module):
         
         #Add recurrency with LSTM layer
         if self.use_recurrency_layer:
-            lstm=lstm_layer(in_size, hidden_size= 64, num_layers=4, batch_first=True ) 
+            lstm=lstm_layer(in_size, hidden_size= 64, num_layers=2, batch_first=True ) 
             self.hidden_layers.append(lstm)
             self.__setattr__("hidden_lstm{}".format(0), lstm)
 

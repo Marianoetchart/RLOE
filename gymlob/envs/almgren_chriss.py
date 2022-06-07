@@ -111,10 +111,10 @@ class AlmgrenChrissEnv(gym.Env):
         self.executed_orders = []
 
         # store to later do reward normalization
-        self.implementation_shortfall_arr = [0]
+        self.implementation_shortfall_arr = []
 
-        # Set the initial impacted price to the starting price
-        self.prevImpactedPrice = self.startingPrice
+        # the accumulated impact across timesteps
+        self.PermanentImpact = 0 
 
         # Set the initial transaction state to False
         self.transacting = False
@@ -152,6 +152,8 @@ class AlmgrenChrissEnv(gym.Env):
         self.startingPrice = self.episode_orderbook_df.loc[self.current_time].mid_price
 
         self.executed_orders = []
+        self.PermanentImpact = 0 
+        self.implementation_shortfall_arr = []
         self.step_num = 1
 
         self.start_transactions()
@@ -204,7 +206,7 @@ class AlmgrenChrissEnv(gym.Env):
         info.done = False
 
         current_ob_snapshot = self.episode_orderbook_df.loc[self.current_time]
-        info.price = current_ob_snapshot.mid_price
+        info.price = current_ob_snapshot.mid_price - self.PermanentImpact 
 
         # During training, if the DDPG fails to sell all the stocks before the given
         # number of trades or if the total number shares remaining is less than 1, then stop transacting,
@@ -297,7 +299,7 @@ class AlmgrenChrissEnv(gym.Env):
             # Update the variables required for the next step
             self.time_remaining -= 1
             self.prevPrice = info.price
-            self.prevImpactedPrice = info.price - info.currentPermanentImpact
+            self.PermanentImpact +=  info.currentPermanentImpact
 
             # Calculate the reward
             #currentUtility = self.compute_AC_utility(self.shares_remaining)
@@ -340,14 +342,11 @@ class AlmgrenChrissEnv(gym.Env):
 
         mean = np.mean(self.implementation_shortfall_arr)
         std = np.std(self.implementation_shortfall_arr)
+        if std == 0:std = 1
         impShortFall = impShortFall * -1 
         x_zscored = np.float64((impShortFall - mean) / std)
         x = torch.tanh(torch.tensor([x_zscored], dtype=torch.float64))
         return np.float64(x.item())
-
-        #sigMoid = torch.nn.Sigmoid()
-        #x = sigMoid(torch.tensor([impShortFall*-1], dtype=torch.float64))
-        #return np.float64(x.item())
 
     def permanentImpact(self, sharesToSell, spread):
         # Calculate the permanent impact according to equations (6) and (1) of the AC paper

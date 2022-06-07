@@ -144,25 +144,25 @@ class DQNAgent(Agent):
                     wandb.log(
                         {
                             "episode": self.i_episode,
-                            "num steps": self.episode_step,
-                            "episode reward": episode_reward,
-                            "time remaining": time_remaining,
-                            "quantity remaining": quantity_remaining,
-                            "action": action,
-                            "total num steps": self.total_step,
-                            "avg time per step": avg_time_cost,
-                            "time per episode": t_end - t_begin,
-                            "implementation shortfall" :  state_info.implementation_shortfall,
-                            "permanent impact" :  state_info.currentPermanentImpact,
-                            "temporary impact" :  state_info.currentTemporaryImpact,
-                            "memory size": len(self.memory_n)
+                            "Num Steps": self.episode_step,
+                            "Episode Reward": episode_reward,
+                            "Time Remaining": time_remaining,
+                            "Quantity Remaining": quantity_remaining,
+                            "Action": action,
+                            "Total Num Steps": self.total_step,
+                            "Avg Time Per Step": avg_time_cost,
+                            "Time Per Episode": t_end - t_begin,
+                            "Implementation Shortfall" :  state_info.implementation_shortfall,
+                            "Permanent Impact" :  state_info.currentPermanentImpact,
+                            "Temporary Impact" :  state_info.currentTemporaryImpact,
+                            "Memory Size": len(self.memory_n),
                         }
                     )
                     if running_loss != 0:
                         wandb.log(
                             {
-
-                                "training loss": running_loss
+                                "Average Action Values (Q)": q_values,
+                                "Training Loss": running_loss
                             }
                         ) 
 
