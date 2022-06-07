@@ -7,20 +7,20 @@ test: False
 num_experiments_in_parallel: 1
 
 # data config
-orderbook_file_path: "/efs/mm/lobrep/data/TSLA_2015-01-01_2015-01-31_10/TSLA_2015-01-05_34200000_57600000_orderbook_10.csv"
-orders_file_path: "/efs/mm/lobrep/data/TSLA_2015-01-01_2015-01-31_10/TSLA_2015-01-05_34200000_57600000_message_10.csv"
+orderbook_file_path: "/home/paperspace/Documents/RLOE/TSLA_2015-01-05_34200000_57600000_orderbook_10.csv"
+orders_file_path: "/home/paperspace/Documents/RLOE/TSLA_2015-01-05_34200000_57600000_message_10.csv"
 
 # client order information
 instrument: "TSLA"
 date: "2015-01-05"
 frequency: "1s"
-direction: "BUY"
-quantity: 1000
+direction: "SELL"
+quantity: 2000
 duration: 120
 benchmark: "arrival"
 
 num_train_episodes: 20000000000
-save_params_every: 100 # in episodes
+save_params_every: 500 # in episodes
 
 defaults:
   - algo: dqn

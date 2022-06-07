@@ -95,8 +95,6 @@ class DQNLearner(Learner):
 
         dq_loss_element_wise, q_values = self.loss_fn(self.dqn, self.dqn_target, experience_1, gamma)
 
-        dq_loss = torch.mean(dq_loss_element_wise * weights)
-
         # n step loss
         if self.use_n_step:
             gamma = self.hyper_params.gamma ** self.hyper_params.n_step
@@ -106,7 +104,7 @@ class DQNLearner(Learner):
             # to update loss and priorities
             q_values = 0.5 * (q_values + q_values_n)
             dq_loss_element_wise += dq_loss_n_element_wise * self.hyper_params.w_n_step
-            dq_loss = torch.mean(dq_loss_element_wise * weights)
+        dq_loss = torch.mean(dq_loss_element_wise * weights)
 
         # q_value regularization
         q_regular = torch.norm(q_values, 2).mean() * self.hyper_params.w_q_reg
@@ -133,7 +131,7 @@ class DQNLearner(Learner):
             self.dqn.head.reset_noise()
             self.dqn_target.head.reset_noise()
 
-        return (loss.item(), q_values.mean().item(), indices, new_priorities,)
+        return (loss.item(), q_values.mean().item(), indices, new_priorities,) 
 
     def get_state_dict(self) -> OrderedDict:
         """Return state dicts, mainly for distributed worker."""

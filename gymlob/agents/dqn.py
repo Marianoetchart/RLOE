@@ -50,8 +50,9 @@ class DQNAgent(Agent):
         self.current_state = state
 
         # epsilon greedy policy
-        if not self.cfg.test and self.epsilon > np.random.random():
-            selected_action = np.array(self.env.action_space.sample())
+        if not self.cfg.test and (self.epsilon > np.random.random() \
+             or len(self.memory) <= self.hyper_params.update_starts_from):
+             selected_action = np.array(self.env.action_space.sample())
         else:
             with torch.no_grad():
                 state = numpy2floattensor(state, self.learner.device)
@@ -102,6 +103,7 @@ class DQNAgent(Agent):
 
             self.episode_step = 0
             episode_reward = 0
+            running_loss = 0
             done = False
             state = self.env.reset()
 
@@ -112,14 +114,16 @@ class DQNAgent(Agent):
 
                 self.total_step += 1
                 self.episode_step += 1
+                state = next_state
+                episode_reward += reward
 
-                if len(self.memory_n) >= self.hyper_params.update_starts_from:
+                if len(self.memory) >= self.hyper_params.update_starts_from:
                     if self.total_step % self.hyper_params.train_freq == 0:
                         for _ in range(self.hyper_params.multiple_update):
                             experience = self.sample_experience()
-                            info = self.learner.update_model(experience)
-                            indices, new_priorities = info[2:4]
+                            loss, q_values, indices, new_priorities = self.learner.update_model(experience)
                             self.memory.update_priorities(indices, new_priorities)
+                            running_loss += loss
 
                     # decrease epsilon
                     self.epsilon = max(self.epsilon
@@ -131,39 +135,36 @@ class DQNAgent(Agent):
                     fraction = min(float(self.i_episode) / self.cfg.num_train_episodes, 1.0)
                     self.per_beta = self.per_beta + fraction * (1.0 - self.per_beta)
 
-                state = next_state
-                episode_reward += reward
-
             t_end = time.time()
             avg_time_cost = (t_end - t_begin) / self.episode_step
 
-            #check memory metrics
-            t = torch.cuda.get_device_properties(0).total_memory
-            r = torch.cuda.memory_reserved(0)
-            a = torch.cuda.memory_allocated(0)
-            f = r-a 
-
             if self.cfg.log_wb or self.cfg.log_cmd:
-                time_remaining, quantity_remaining, _, _ = state
+                time_remaining, quantity_remaining, _, _, action = state
                 if self.cfg.log_wb:
                     wandb.log(
                         {
                             "episode": self.i_episode,
                             "num steps": self.episode_step,
-                            "reward": episode_reward,
+                            "episode reward": episode_reward,
                             "time remaining": time_remaining,
                             "quantity remaining": quantity_remaining,
+                            "action": action,
                             "total num steps": self.total_step,
                             "avg time per step": avg_time_cost,
                             "time per episode": t_end - t_begin,
                             "implementation shortfall" :  state_info.implementation_shortfall,
                             "permanent impact" :  state_info.currentPermanentImpact,
                             "temporary impact" :  state_info.currentTemporaryImpact,
-                            "memory size": len(self.memory_n),
-                            "cuda free memory": f,
-                            "cuda total memory": t
+                            "memory size": len(self.memory_n)
                         }
                     )
+                    if running_loss != 0:
+                        wandb.log(
+                            {
+
+                                "training loss": running_loss
+                            }
+                        ) 
 
             if self.i_episode % self.cfg.save_params_every == 0:
                 self.learner.save_params(self.i_episode)

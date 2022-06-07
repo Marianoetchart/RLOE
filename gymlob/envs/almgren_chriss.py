@@ -2,6 +2,7 @@ import random
 import numpy as np
 import pandas as pd
 import collections
+import torch
 
 import gym
 from gymlob.envs.spaces.observation_spaces import get_observation_space
@@ -19,13 +20,10 @@ DAILY_VOLAT = ANNUAL_VOLAT / np.sqrt(TRAD_DAYS)  # Daily volatility in stock pri
 
 # ----------------------------- Parameters for the Almgren and Chriss Optimal Execution Model ----------------------- #
 
-TOTAL_SHARES = 1000000  # Total number of shares to sell
-STARTING_PRICE = 50  # Starting price per share
 LLAMBDA = 1e-6  # Trader's risk aversion
-LIQUIDATION_TIME = 60  # How many days to sell all the shares.
+LIQUIDATION_TIME = 1  # How many days to sell all the shares.
 NUM_N = 60  # Number of trades
 EPSILON = BID_ASK_SP / 2  # Fixed Cost of Selling.
-SINGLE_STEP_VARIANCE = (DAILY_VOLAT * STARTING_PRICE) ** 2  # Calculate single step variance
 ETA = BID_ASK_SP / (0.01 * DAILY_TRADE_VOL)  # Price Impact for Each 1% of Daily Volume Traded
 GAMMA = BID_ASK_SP / (0.1 * DAILY_TRADE_VOL)  # Permanent Impact Constant
 
@@ -90,13 +88,13 @@ class AlmgrenChrissEnv(gym.Env):
             self.action_space = flatten_space(get_continuous_action_space(self.client_order_info))
 
         # Initialize the Almgren-Chriss parameters so we can access them later
-        self.total_shares = TOTAL_SHARES
-        self.startingPrice = STARTING_PRICE
+        self.total_shares = self.client_order_info['quantity']
+        self.startingPrice = self.episode_orderbook_df.loc[self.current_time].mid_price
         self.llambda = lambd
         self.liquidation_time = lqd_time
         self.num_n = num_tr
         self.epsilon = EPSILON
-        self.singleStepVariance = SINGLE_STEP_VARIANCE
+        self.singleStepVariance =  (DAILY_VOLAT * self.startingPrice) ** 2 
         self.eta = ETA
         self.gamma = GAMMA
 
@@ -112,6 +110,9 @@ class AlmgrenChrissEnv(gym.Env):
         self.logReturns = collections.deque(np.zeros(6))
         self.executed_orders = []
 
+        # store to later do reward normalization
+        self.implementation_shortfall_arr = [0]
+
         # Set the initial impacted price to the starting price
         self.prevImpactedPrice = self.startingPrice
 
@@ -121,7 +122,7 @@ class AlmgrenChrissEnv(gym.Env):
         # Set a variable to keep trak of the trade number
         self.k = 0
 
-    def reset(self, seed=0, liquid_time=LIQUIDATION_TIME, num_trades=NUM_N, lamb=LLAMBDA, total_shares = TOTAL_SHARES):
+    def reset(self, seed=0 ):
 
         # # Initialize the environment with the given parameters
         #self.__init__(randomSeed=seed, lqd_time=liquid_time, num_tr=num_trades, lambd=lamb)
@@ -148,6 +149,7 @@ class AlmgrenChrissEnv(gym.Env):
         self.current_time = self.start_time
         self.time_remaining = self.client_order_info['duration']
         self.quantity_remaining = self.client_order_info['quantity']
+        self.startingPrice = self.episode_orderbook_df.loc[self.current_time].mid_price
 
         self.executed_orders = []
         self.step_num = 1
@@ -160,7 +162,8 @@ class AlmgrenChrissEnv(gym.Env):
                             "time_remaining": self.time_remaining,
                             "quantity_remaining": self.quantity_remaining,
                             "spread": self.episode_orderbook_df.iloc[0]['spread'],
-                            "order_volume_imbalance": self.episode_orderbook_df.iloc[0]['order_volume_imbalance']
+                            "order_volume_imbalance": self.episode_orderbook_df.iloc[0]['order_volume_imbalance'],
+                            "action": 0
                         }
                     ))
 
@@ -187,7 +190,7 @@ class AlmgrenChrissEnv(gym.Env):
         self.totalSRSQ = 0
 
         # Set the initial AC utility
-        self.prevUtility = self.compute_AC_utility(self.total_shares)
+        #self.prevUtility = self.compute_AC_utility(self.total_shares)
 
     def step(self, action):
 
@@ -200,6 +203,9 @@ class AlmgrenChrissEnv(gym.Env):
         # Set the done flag to False. This indicates that we haven't sold all the shares yet.
         info.done = False
 
+        current_ob_snapshot = self.episode_orderbook_df.loc[self.current_time]
+        info.price = current_ob_snapshot.mid_price
+
         # During training, if the DDPG fails to sell all the stocks before the given
         # number of trades or if the total number shares remaining is less than 1, then stop transacting,
         # set the done Flag to True, return the current implementation shortfall, and give a negative reward.
@@ -207,23 +213,39 @@ class AlmgrenChrissEnv(gym.Env):
         if self.transacting and (self.time_remaining == 0 or abs(self.shares_remaining) < self.tolerance):
             self.transacting = False
             info.done = True
+
+            info.share_to_sell_now = self.shares_remaining
+            # Calculate the permanent and temporary impact on the stock price according the AC price dynamics model
+            info.currentPermanentImpact = self.permanentImpact(info.share_to_sell_now, current_ob_snapshot.spread)
+            info.currentTemporaryImpact = self.temporaryImpact(info.share_to_sell_now)
+
+            # Apply the temporary and permanent impact on the current stock price
+            info.exec_price = info.price - info.currentTemporaryImpact - info.currentPermanentImpact
+
+            # Calculate the current total capture
+            self.totalCapture += info.share_to_sell_now * info.exec_price
+
             info.implementation_shortfall = self.total_shares * self.startingPrice - self.totalCapture
+            self.implementation_shortfall_arr.append(info.implementation_shortfall)
+            reward = self.getReward(info.implementation_shortfall)
+
             info.expected_shortfall = self.get_expected_shortfall(self.total_shares)
             info.expected_variance = self.singleStepVariance * self.tau * self.totalSRSQ
             info.utility = info.expected_shortfall + self.llambda * info.expected_variance
 
         # We don't add noise before the first trade
-        if self.k == 0:
-            info.price = self.prevImpactedPrice
-        else:
+        #if self.k == 0:
+        #    info.price = self.prevImpactedPrice
+        #else:
             # Calculate the current stock price using arithmetic brownian motion
-            info.price = self.prevImpactedPrice + np.sqrt(self.singleStepVariance * self.tau) * random.normalvariate(0,
-                                                                                                                     1)
+            #info.price = self.prevImpactedPrice + np.sqrt(self.singleStepVariance * self.tau) * random.normalvariate(0,
+            #                                                                                                         1)
+        #    info.price = current_ob_snapshot.mid_price
 
         # If we are transacting, the stock price is affected by the number of shares we sell. The price evolves
         # according to the Almgren and Chriss price dynamics model.
         if self.transacting:
-
+            
             # If action is an ndarray then extract the number from the array
             if isinstance(action, np.ndarray):
                 action = action.item()
@@ -231,8 +253,6 @@ class AlmgrenChrissEnv(gym.Env):
             # Convert the action to the number of shares to sell in the current step
             # sharesToSellNow = self.shares_remaining * action
             # sharesToSellNow = min(self.shares_remaining * action, self.shares_remaining)
-            
-            current_ob_snapshot = self.episode_orderbook_df.loc[self.current_time]
 
             size = action  #size = int(action[0]) if not self.discrete_action_space else action
 
@@ -251,11 +271,11 @@ class AlmgrenChrissEnv(gym.Env):
             info.share_to_sell_now = np.around(sharesToSellNow)
 
             # Calculate the permanent and temporary impact on the stock price according the AC price dynamics model
-            info.currentPermanentImpact = self.permanentImpact(info.share_to_sell_now)
+            info.currentPermanentImpact = self.permanentImpact(info.share_to_sell_now, current_ob_snapshot.spread)
             info.currentTemporaryImpact = self.temporaryImpact(info.share_to_sell_now)
 
-            # Apply the temporary impact on the current stock price
-            info.exec_price = info.price - info.currentTemporaryImpact
+            # Apply the temporary and permanent impact on the current stock price
+            info.exec_price = info.price - info.currentTemporaryImpact - info.currentPermanentImpact
 
             # Calculate the current total capture
             self.totalCapture += info.share_to_sell_now * info.exec_price
@@ -280,13 +300,16 @@ class AlmgrenChrissEnv(gym.Env):
             self.prevImpactedPrice = info.price - info.currentPermanentImpact
 
             # Calculate the reward
-            currentUtility = self.compute_AC_utility(self.shares_remaining)
-            reward = (abs(self.prevUtility) - abs(currentUtility)) / abs(self.prevUtility)
+            #currentUtility = self.compute_AC_utility(self.shares_remaining)
+            #reward = (abs(self.prevUtility) - abs(currentUtility)) / abs(self.prevUtility)
+            info.implementation_shortfall = self.total_shares * self.startingPrice - self.totalCapture
+            self.implementation_shortfall_arr.append(info.implementation_shortfall)
+            reward = self.getReward(info.implementation_shortfall)
 
             if type(reward) !=  np.float64:
                 print('Error')
 
-            self.prevUtility = currentUtility
+            #self.prevUtility = currentUtility
 
             # If all the shares have been sold calculate E, V, and U, and give a positive reward.
             if self.shares_remaining <= 0:
@@ -295,15 +318,9 @@ class AlmgrenChrissEnv(gym.Env):
 
                 # Set the done flag to True. This indicates that we have sold all the shares
                 info.done = True
-        else:
-            reward = 0.0
 
         self.k += 1
-
-        # Set the new state
-        # state = np.array(
-        #     list(self.logReturns) + [self.timeHorizon / self.num_n, self.shares_remaining / self.total_shares])
-
+    
         observation = flatten(
             space=get_observation_space(self.client_order_info),
             x=collections.OrderedDict(
@@ -311,14 +328,30 @@ class AlmgrenChrissEnv(gym.Env):
                     "time_remaining": self.time_remaining,
                     "quantity_remaining": self.shares_remaining,
                     "spread": self.episode_orderbook_df.loc[self.current_time]['spread'],
-                    "order_volume_imbalance": self.episode_orderbook_df.loc[self.current_time]['order_volume_imbalance']
+                    "order_volume_imbalance": self.episode_orderbook_df.loc[self.current_time]['order_volume_imbalance'], 
+                    "action":action
                 })
         )
 
         return (observation , np.array([reward]), info.done, info)
 
-    def permanentImpact(self, sharesToSell):
+
+    def getReward(self, impShortFall):
+
+        mean = np.mean(self.implementation_shortfall_arr)
+        std = np.std(self.implementation_shortfall_arr)
+        impShortFall = impShortFall * -1 
+        x_zscored = np.float64((impShortFall - mean) / std)
+        x = torch.tanh(torch.tensor([x_zscored], dtype=torch.float64))
+        return np.float64(x.item())
+
+        #sigMoid = torch.nn.Sigmoid()
+        #x = sigMoid(torch.tensor([impShortFall*-1], dtype=torch.float64))
+        #return np.float64(x.item())
+
+    def permanentImpact(self, sharesToSell, spread):
         # Calculate the permanent impact according to equations (6) and (1) of the AC paper
+        self.gamma = spread / (0.1 * DAILY_TRADE_VOL)
         pi = self.gamma * sharesToSell
         return pi
 

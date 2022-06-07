@@ -46,7 +46,7 @@ class NeuralNetwork(nn.Module):
             -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """Forward method implementation. Use in get_action method in agents."""
         x = self.backbone(x)
-        x = self.head(x)
+        x = self.head(x.view(-1,self.head_cfg.configs.input_size))
         return x
 
     def forward_(self, x: torch.Tensor):
@@ -59,7 +59,7 @@ class NeuralNetwork(nn.Module):
         """Calculate fc input size according to the shape of cnn."""
         if type(state_dim) == omegaconf.listconfig.ListConfig:
             state_dim = tuple(state_dim)
-        #x = torch.zeros(state_dim).unsqueeze(0)
-        x = torch.zeros(1,state_dim[0],1,1) 
+        x = torch.zeros(state_dim).unsqueeze(0)
+        #x = torch.zeros(1,state_dim[0],1,1) 
         output = self.backbone(x).detach().view(-1)
         return output.shape[0]
