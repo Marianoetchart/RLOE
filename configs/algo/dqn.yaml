@@ -7,7 +7,7 @@ hyper_params:
   tau: 0.005
   buffer_size: 1000000         # openai baselines: 10000
   batch_size: 32               # openai baselines: 32
-  update_starts_from: 500000  # openai baselines: 10000
+  update_starts_from: 1000000  # openai baselines: 10000
   multiple_update: 1          # multiple learning updates
   train_freq: 15               # in openai baselines, train_freq = 4
   gradient_clip: 10         # dueling: 10.0
@@ -19,6 +19,7 @@ hyper_params:
   per_eps: 0.000001
   max_epsilon: 1.0
   min_epsilon: 0.01           # openai baselines: 0.01
+  epsilon_timesteps: 1000000
   epsilon_decay: 0.00001      # openai baselines: 1e-7 / 1e-1
 
 learner_cfg:
@@ -39,8 +40,8 @@ learner_cfg:
       v_max: 300
       atom_size: 1530
       output_activation: "identity"
-      use_noisy_net: True
-      use_recurrency_layer: True
+      use_noisy_net: False
+      use_recurrency_layer: False
   optim_cfg:
     lr_dqn: 0.0001
     weight_decay: 0.0000001

@@ -11,7 +11,7 @@ from gymlob.agents.agent import Agent
 from gymlob.learners.dqn import DQNLearner
 
 from gymlob.utils.replay_buffer import ReplayBuffer, PrioritizedBufferWrapper
-from gymlob.utils.utils import numpy2floattensor, add_widxheight_dim
+from gymlob.utils.utils import numpy2floattensor, add_widxheight_dim, LinearSchedule
 
 
 class DQNAgent(Agent):
@@ -28,6 +28,7 @@ class DQNAgent(Agent):
         self.per_beta = self.hyper_params.per_beta
         self.use_n_step = self.hyper_params.n_step > 1
         self.epsilon = self.hyper_params.max_epsilon
+        self.ep_schedule = LinearSchedule(self.hyper_params.epsilon_timesteps,self.hyper_params.min_epsilon,self.hyper_params.max_epsilon )
 
         if not self.cfg.test:
             # replay memory for a single step
@@ -41,6 +42,7 @@ class DQNAgent(Agent):
 
         self.current_state = np.zeros(1)
         self.episode_step = 0
+        self.exploitation_steps = 0
         self.i_episode = 0
 
     def select_action(self,
@@ -50,8 +52,7 @@ class DQNAgent(Agent):
         self.current_state = state
 
         # epsilon greedy policy
-        if not self.cfg.test and (self.epsilon > np.random.random() \
-             or len(self.memory) <= self.hyper_params.update_starts_from):
+        if not self.cfg.test and (self.epsilon > np.random.random()):
              selected_action = np.array(self.env.action_space.sample())
         else:
             with torch.no_grad():
@@ -118,6 +119,7 @@ class DQNAgent(Agent):
                 episode_reward += reward
 
                 if len(self.memory) >= self.hyper_params.update_starts_from:
+
                     if self.total_step % self.hyper_params.train_freq == 0:
                         for _ in range(self.hyper_params.multiple_update):
                             experience = self.sample_experience()
@@ -126,10 +128,12 @@ class DQNAgent(Agent):
                             running_loss += loss
 
                     # decrease epsilon
-                    self.epsilon = max(self.epsilon
-                                       - (self.hyper_params.max_epsilon - self.hyper_params.min_epsilon)
-                                       * self.hyper_params.epsilon_decay,
-                                       self.hyper_params.min_epsilon)
+                    self.epsilon = self.ep_schedule.value(self.exploitation_steps)
+                    self.exploitation_steps += 1
+                    #self.epsilon = max(self.epsilon
+                    #                   - (self.hyper_params.max_epsilon - self.hyper_params.min_epsilon)
+                    #                   * self.hyper_params.epsilon_decay,
+                    #                   self.hyper_params.min_epsilon)
 
                     # increase priority beta
                     fraction = min(float(self.i_episode) / self.cfg.num_train_episodes, 1.0)
