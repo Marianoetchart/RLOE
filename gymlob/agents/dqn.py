@@ -1,4 +1,5 @@
 import time
+import statistics
 import typing
 
 import gym
@@ -105,6 +106,9 @@ class DQNAgent(Agent):
             self.episode_step = 0
             episode_reward = 0
             running_loss = 0
+            implementation_shortfalls = []
+            perm_impacts= [] 
+            temp_impacts= [] 
             done = False
             state = self.env.reset()
 
@@ -117,19 +121,18 @@ class DQNAgent(Agent):
                 self.episode_step += 1
                 state = next_state
                 episode_reward += reward
+                implementation_shortfalls.append(state_info.implementation_shortfall)
+                perm_impacts.append(state_info.currentPermanentImpact)
+                temp_impacts.append(state_info.currentTemporaryImpact)
+
 
                 if len(self.memory) >= self.hyper_params.update_starts_from:
-
                     if self.total_step % self.hyper_params.train_freq == 0:
                         for _ in range(self.hyper_params.multiple_update):
                             experience = self.sample_experience()
                             loss, q_values, indices, new_priorities = self.learner.update_model(experience)
                             self.memory.update_priorities(indices, new_priorities)
                             running_loss += loss
-
-                    # decrease epsilon
-                    self.epsilon = self.ep_schedule.value(self.exploitation_steps)
-                    self.exploitation_steps += 1
                     #self.epsilon = max(self.epsilon
                     #                   - (self.hyper_params.max_epsilon - self.hyper_params.min_epsilon)
                     #                   * self.hyper_params.epsilon_decay,
@@ -138,13 +141,16 @@ class DQNAgent(Agent):
                     # increase priority beta
                     fraction = min(float(self.i_episode) / self.cfg.num_train_episodes, 1.0)
                     self.per_beta = self.per_beta + fraction * (1.0 - self.per_beta)
+                
+                # decrease epsilon
+                self.epsilon = self.ep_schedule.value(self.i_episode)
 
             t_end = time.time()
             avg_time_cost = (t_end - t_begin) / self.episode_step
 
             if self.cfg.log_wb or self.cfg.log_cmd:
                 time_remaining, quantity_remaining, _, _, action = state
-                if self.cfg.log_wb:
+                if self.cfg.log_wb and (self.i_episode % self.cfg.log_freq == 0):
                     wandb.log(
                         {
                             "episode": self.i_episode,
@@ -152,19 +158,20 @@ class DQNAgent(Agent):
                             "Episode Reward": episode_reward,
                             "Time Remaining": time_remaining,
                             "Quantity Remaining": quantity_remaining,
-                            "Action": action,
+                            "End Action": action,
                             "Total Num Steps": self.total_step,
                             "Avg Time Per Step": avg_time_cost,
                             "Time Per Episode": t_end - t_begin,
-                            "Implementation Shortfall" :  state_info.implementation_shortfall,
-                            "Permanent Impact" :  state_info.currentPermanentImpact,
-                            "Temporary Impact" :  state_info.currentTemporaryImpact,
+                            "Avg Implementation Shortfall" :  statistics.mean(implementation_shortfalls),
+                            "Avg Permanent Impact" :  statistics.mean(perm_impacts),
+                            "Avg Temporary Impact" :  statistics.mean(temp_impacts),
                             "Memory Size": len(self.memory_n),
                         }
                     )
                     if running_loss != 0:
                         wandb.log(
                             {
+                                "episode": self.i_episode,
                                 "Average Action Values (Q)": q_values,
                                 "Training Loss": running_loss
                             }
@@ -177,4 +184,5 @@ class DQNAgent(Agent):
         self.learner.save_params(self.i_episode)
 
     def test(self):
+        twap_quantity = self.cfg.quantity  / self.cfg.duration 
         super().test()

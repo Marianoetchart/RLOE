@@ -14,7 +14,7 @@ from gymlob.utils.data.lobster import LOBSTERDataLoader
 
 ANNUAL_VOLAT = 0.12  # Annual volatility in stock price
 BID_ASK_SP = 1 / 8  # Bid-ask spread
-DAILY_TRADE_VOL = 5e6  # Average Daily trading volume
+DAILY_TRADE_VOL = 25e6  # Average Daily trading volume
 TRAD_DAYS = 250  # Number of trading days in a year
 DAILY_VOLAT = ANNUAL_VOLAT / np.sqrt(TRAD_DAYS)  # Daily volatility in stock price
 
@@ -112,6 +112,8 @@ class AlmgrenChrissEnv(gym.Env):
 
         # store to later do reward normalization
         self.implementation_shortfall_arr = []
+        # storing the previous val to compute change in imp shortfall
+        self.prev_implementation_shortfall = 0 
 
         # the accumulated impact across timesteps
         self.PermanentImpact = 0 
@@ -261,7 +263,7 @@ class AlmgrenChrissEnv(gym.Env):
             step_executed_orders = self.handle_market_order(direction=self.client_order_info['direction'],
                                                             size=size,
                                                             orderbook_snapshot=current_ob_snapshot)
-
+     
             self.executed_orders.append(step_executed_orders)
 
             sharesToSellNow =  int(sum([order[0] for order in step_executed_orders])) 
@@ -311,7 +313,7 @@ class AlmgrenChrissEnv(gym.Env):
             if type(reward) !=  np.float64:
                 print('Error')
 
-            #self.prevUtility = currentUtility
+            self.prevPrice = info.price 
 
             # If all the shares have been sold calculate E, V, and U, and give a positive reward.
             if self.shares_remaining <= 0:
@@ -343,11 +345,20 @@ class AlmgrenChrissEnv(gym.Env):
         mean = np.mean(self.implementation_shortfall_arr)
         std = np.std(self.implementation_shortfall_arr)
         if std == 0:std = 1
-        impShortFall = impShortFall * -1 
-        x_zscored = np.float64((impShortFall - mean) / std)
-        x = torch.tanh(torch.tensor([x_zscored], dtype=torch.float64))
-        return np.float64(x.item())
+        impShortFall = np.float64((impShortFall - mean) / std)
 
+        # compute meaninful value of percent change 
+        if self.prev_implementation_shortfall == 0:
+            impShortFallChange = 0 
+        else:
+            impShortFallChange = impShortFall - self.prev_implementation_shortfall / abs(self.prev_implementation_shortfall)
+
+        self.prev_implementation_shortfall = impShortFall
+
+        impShortFallChange = torch.tanh(torch.tensor([impShortFallChange], dtype=torch.float64)).item()
+
+        return np.float64(impShortFallChange)
+        
     def permanentImpact(self, sharesToSell, spread):
         # Calculate the permanent impact according to equations (6) and (1) of the AC paper
         self.gamma = spread / (0.1 * DAILY_TRADE_VOL)

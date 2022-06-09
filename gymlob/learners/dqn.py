@@ -45,9 +45,15 @@ class DQNLearner(Learner):
         self.dqn_target.load_state_dict(self.dqn.state_dict())
 
         # create optimizer
-        self.dqn_optim = optim.Adam(list(self.dqn.parameters()),
+        #self.dqn_optim = optim.Adam(list(self.dqn.parameters()),
+        #                            lr=self.learner_cfg.optim_cfg.lr_dqn,
+        #                            weight_decay=self.learner_cfg.optim_cfg.weight_decay,
+        #                            eps=self.learner_cfg.optim_cfg.adam_eps,)
+
+        self.dqn_optim = optim.RMSprop(list(self.dqn.parameters()),
                                     lr=self.learner_cfg.optim_cfg.lr_dqn,
                                     weight_decay=self.learner_cfg.optim_cfg.weight_decay,
+                                    momentum=self.learner_cfg.optim_cfg.momentum,
                                     eps=self.learner_cfg.optim_cfg.adam_eps,)
 
         # load the optimizer and model parameters

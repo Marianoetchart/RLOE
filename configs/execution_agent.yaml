@@ -21,6 +21,7 @@ benchmark: "arrival"
 
 num_train_episodes: 20000000000
 save_params_every: 1000 # in episodes
+log_freq: 500
 
 defaults:
   - algo: dqn
