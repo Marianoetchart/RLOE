@@ -342,10 +342,10 @@ class AlmgrenChrissEnv(gym.Env):
 
     def getReward(self, impShortFall):
 
-        mean = np.mean(self.implementation_shortfall_arr)
-        std = np.std(self.implementation_shortfall_arr)
-        if std == 0:std = 1
-        impShortFall = np.float64((impShortFall - mean) / std)
+        #mean = np.mean(self.implementation_shortfall_arr)
+        #std = np.std(self.implementation_shortfall_arr)
+        #if std == 0:std = 1
+        #impShortFall = np.float64((impShortFall - mean) / std)
 
         # compute meaninful value of percent change 
         if self.prev_implementation_shortfall == 0:
@@ -355,7 +355,9 @@ class AlmgrenChrissEnv(gym.Env):
 
         self.prev_implementation_shortfall = impShortFall
 
-        impShortFallChange = torch.tanh(torch.tensor([impShortFallChange], dtype=torch.float64)).item()
+        impShortFallChange = impShortFallChange * (-1 / 10000)  # inverse so goal is to reduce it 
+
+        #impShortFallChange = torch.tanh(torch.tensor([impShortFallChange], dtype=torch.float64)).item()
 
         return np.float64(impShortFallChange)
         

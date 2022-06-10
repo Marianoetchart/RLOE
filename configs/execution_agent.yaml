@@ -5,7 +5,8 @@ log_cmd: False
 log_wb: True
 test: False
 num_experiments_in_parallel: 1
-
+experiment_name: "noStanMiniRNN_LR4"
+ 
 # data config
 orderbook_file_path: "/home/paperspace/Documents/RLOE/TSLA_2015-01-05_34200000_57600000_orderbook_10.csv"
 orders_file_path: "/home/paperspace/Documents/RLOE/TSLA_2015-01-05_34200000_57600000_message_10.csv"

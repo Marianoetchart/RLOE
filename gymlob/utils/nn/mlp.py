@@ -67,7 +67,7 @@ class MLP(nn.Module):
 
         self.linear_layer = linear_layer
         self.use_output_layer = use_output_layer
-        self.use_recurrency_layer = use_recurrency_layer
+        self.use_recurrency_layer = configs.use_recurrency_layer
         self.n_category = n_category
 
         # set hidden layers
@@ -81,7 +81,8 @@ class MLP(nn.Module):
         
         #Add recurrency with LSTM layer
         if self.use_recurrency_layer:
-            lstm=lstm_layer(in_size, hidden_size= 64, num_layers=2, batch_first=True ) 
+            lstm=lstm_layer(in_size, hidden_size=in_size, num_layers=2, batch_first=True ) 
+            #self.lstm_hidden = 
             self.hidden_layers.append(lstm)
             self.__setattr__("hidden_lstm{}".format(0), lstm)
 
@@ -97,6 +98,9 @@ class MLP(nn.Module):
         """Forward method implementation."""
         for hidden_layer in self.hidden_layers:
             if type(hidden_layer) == nn.LSTM:
+                
+
+
                 x, h_n = hidden_layer(x.unsqueeze(0))
                 x = self.hidden_activation(x)
                 x = x.squeeze(0)

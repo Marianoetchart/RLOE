@@ -1,5 +1,4 @@
-ROOT_DIR = '/efs/mm/gymlob/'
-#ROOT_DIR = '/mnt/c/Users/Mariano/Documents/VSCode Projects/gymlob/'
+ROOT_DIR = '/home/paperspace/Documents/RLOE/'
 
 import sys
 import os
@@ -25,10 +24,12 @@ CONFIG_PATH = ROOT_DIR + 'configs/'
 def main(cfg: DictConfig):
     OmegaConf.set_struct(cfg, False)
     print(OmegaConf.to_yaml(cfg))
+    
+    run(cfg.seeds[0], cfg)
 
-    Parallel(n_jobs=cfg.num_experiments_in_parallel,
-             backend='multiprocessing')(delayed(run)(cfg.seeds[i], cfg)
-                                        for i in range(len(cfg.seeds)))
+    #Parallel(n_jobs=cfg.num_experiments_in_parallel,
+    #         backend='multiprocessing')(delayed(run)(cfg.seeds[i], cfg)
+    #                                    for i in range(len(cfg.seeds)))
 
 
 def run(seed: int,
@@ -75,3 +76,4 @@ def run(seed: int,
 
 if __name__ == "__main__":
     main()
+

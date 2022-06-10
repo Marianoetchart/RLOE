@@ -7,7 +7,7 @@ hyper_params:
   tau: 0.005
   buffer_size: 1000000         # openai baselines: 10000
   batch_size: 32               # openai baselines: 32
-  update_starts_from: 1000000  # openai baselines: 10000
+  update_starts_from: 200 #1000000  # openai baselines: 10000
   multiple_update: 1          # multiple learning updates
   train_freq: 15               # in openai baselines, train_freq = 4
   gradient_clip: 10         # dueling: 10.0
@@ -35,7 +35,7 @@ learner_cfg:
   head: 
     type: "MLP"
     configs:
-      hidden_sizes: [128, 64]
+      hidden_sizes: [8, 4]
       v_min: -300
       v_max: 300
       atom_size: 1530
@@ -43,7 +43,7 @@ learner_cfg:
       use_noisy_net: False
       use_recurrency_layer: True
   optim_cfg:
-    lr_dqn: 0.00025
-    weight_decay: 0.0000001
+    lr_dqn: 0.0000000078125  #0.0000625 # 0.000015625 #0.00000390625
+    weight_decay: 0.01 #0.0000001
     adam_eps: 0.00000001
     momentum: 0.95
