@@ -59,6 +59,7 @@ class MLP(nn.Module):
         self.input_size = configs.input_size
         self.output_size = configs.output_size
         self.hidden_activation = hidden_activation
+        self.batch_size = configs.batch_size
 
         if configs.output_activation == 'identity':
             self.output_activation = identity
@@ -81,8 +82,9 @@ class MLP(nn.Module):
         
         #Add recurrency with LSTM layer
         if self.use_recurrency_layer:
-            lstm=lstm_layer(in_size, hidden_size=in_size, num_layers=2, batch_first=True ) 
-            #self.lstm_hidden = 
+            self.lstm_hidden = configs.lstm_hidden_size
+            lstm=lstm_layer(in_size, hidden_size=self.lstm_hidden, num_layers=1 ) 
+            in_size = self.lstm_hidden
             self.hidden_layers.append(lstm)
             self.__setattr__("hidden_lstm{}".format(0), lstm)
 
@@ -94,18 +96,27 @@ class MLP(nn.Module):
             self.output_layer = identity
             self.output_activation = identity
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def init_lstm_hidden_state(self, batch_size, training=None):
+
+        assert training is not None, "training step parameter should be determined"
+
+        if training is True:
+            return torch.zeros([1, self.batch_size, self.lstm_hidden]), torch.zeros([1, self.batch_size, self.lstm_hidden])
+        else:
+            return torch.zeros([1, 1, self.lstm_hidden]), torch.zeros([1, 1, self.lstm_hidden])
+
+    def forward(self, x, h=None, c=None, training = True ) -> torch.Tensor:
         """Forward method implementation."""
         for hidden_layer in self.hidden_layers:
+    
             if type(hidden_layer) == nn.LSTM:
-                
-
-
-                x, h_n = hidden_layer(x.unsqueeze(0))
-                x = self.hidden_activation(x)
-                x = x.squeeze(0)
+                x = x.unsqueeze(0)
+                h,c = self.init_lstm_hidden_state(self.batch_size, training=training)
+                x, (h,c) = hidden_layer(x, (h.cuda(),c.cuda()))
+                x = self.hidden_activation(h)
+                x = x.view(x.shape[1], -1)
                 continue
             x = self.hidden_activation(hidden_layer(x))          
         x = self.output_activation(self.output_layer(x))
-
+        
         return x

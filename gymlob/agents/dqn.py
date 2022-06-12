@@ -51,10 +51,15 @@ class DQNAgent(Agent):
                       ) -> np.ndarray:
 
         self.current_state = state
-
+        time_remaining, quantity_remaining, spread, order_volume_imbalance, action = self.current_state
+        
         # epsilon greedy policy
         if not self.cfg.test and (self.epsilon > np.random.random()):
-             selected_action = np.array(self.env.action_space.sample())
+            #if a binomial distribution across the action is selected, select actions that average to TWAP policy
+            if self.cfg.algo.hyper_params.use_binomial_egreedy:
+                selected_action = np.array(np.random.binomial(quantity_remaining, 1/(time_remaining)))
+            else:
+                selected_action = np.array(self.env.action_space.sample())
         else:
             with torch.no_grad():
                 state = numpy2floattensor(state, self.learner.device)
@@ -109,6 +114,7 @@ class DQNAgent(Agent):
             implementation_shortfalls = []
             perm_impacts= [] 
             temp_impacts= [] 
+            slippages = [] 
             done = False
             state = self.env.reset()
 
@@ -124,6 +130,7 @@ class DQNAgent(Agent):
                 implementation_shortfalls.append(state_info.implementation_shortfall)
                 perm_impacts.append(state_info.currentPermanentImpact)
                 temp_impacts.append(state_info.currentTemporaryImpact)
+                slippages.append(state_info.slippage)
 
 
                 if len(self.memory) >= self.hyper_params.update_starts_from:
@@ -162,9 +169,10 @@ class DQNAgent(Agent):
                             "Total Num Steps": self.total_step,
                             "Avg Time Per Step": avg_time_cost,
                             "Time Per Episode": t_end - t_begin,
-                            "Avg Implementation Shortfall" :  statistics.mean(implementation_shortfalls),
+                            "Implementation Shortfall" :  state_info.implementation_shortfall,
                             "Avg Permanent Impact" :  statistics.mean(perm_impacts),
                             "Avg Temporary Impact" :  statistics.mean(temp_impacts),
+                            "Avg Slippage": statistics.mean(slippages),
                             "Memory Size": len(self.memory_n),
                         }
                     )

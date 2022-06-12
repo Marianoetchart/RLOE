@@ -42,17 +42,24 @@ class NeuralNetwork(nn.Module):
             self.head_cfg.configs.input_size = self.calculate_fc_input_size(self.head_cfg.configs.state_size)
         self.head = get_nn_architecture(self.head_cfg)(configs=self.head_cfg.configs)
 
-    def forward(self, x: torch.Tensor) \
+    def forward(self, x, h = None, c = None ) \
             -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """Forward method implementation. Use in get_action method in agents."""
         x = self.backbone(x)
-        x = self.head(x.view(-1,self.head_cfg.configs.input_size))
+        if type(h) == torch.Tensor:
+            x = self.head(x.view(-1,self.head_cfg.configs.input_size), h, c)
+        else:
+            x = self.head(x.view(-1,self.head_cfg.configs.input_size), training = False)
         return x
 
-    def forward_(self, x: torch.Tensor):
-        """Get output value for calculating loss."""
+    def forward_(self, x, h = None, c = None ) \
+            -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+        """Forward method implementation. Use in get_action method in agents."""
         x = self.backbone(x)
-        x = self.head.forward_(x)
+        if type(h) == torch.Tensor:
+            x = self.head.forward_(x.view(-1,self.head_cfg.configs.input_size), h, c)
+        else:
+            x = self.head.forward_(x)
         return x
 
     def calculate_fc_input_size(self, state_dim: tuple):

@@ -40,7 +40,7 @@ class DQNLearner(Learner):
 
         self.dqn = NeuralNetwork(self.learner_cfg.backbone, self.learner_cfg.head).to(self.device)
         self.dqn_target = NeuralNetwork(self.learner_cfg.backbone, self.learner_cfg.head).to(self.device)
-        self.loss_fn = DQNLoss()
+        self.loss_fn = DQNLoss(self.device)
 
         self.dqn_target.load_state_dict(self.dqn.state_dict())
 
@@ -53,8 +53,8 @@ class DQNLearner(Learner):
         self.dqn_optim = optim.RMSprop(list(self.dqn.parameters()),
                                     lr=self.learner_cfg.optim_cfg.lr_dqn,
                                     weight_decay=self.learner_cfg.optim_cfg.weight_decay,
-                                    momentum=self.learner_cfg.optim_cfg.momentum,
-                                    eps=self.learner_cfg.optim_cfg.adam_eps,)
+                                    momentum=self.learner_cfg.optim_cfg.momentum,)
+                                    #eps=self.learner_cfg.optim_cfg.adam_eps,)
 
         # load the optimizer and model parameters
         if self.cfg.load_params_from is not None:
@@ -99,13 +99,13 @@ class DQNLearner(Learner):
 
         gamma = self.hyper_params.gamma
 
-        dq_loss_element_wise, q_values = self.loss_fn(self.dqn, self.dqn_target, experience_1, gamma)
+        dq_loss_element_wise, q_values = self.loss_fn(self.dqn, self.dqn_target, experience_1, gamma, self.cfg)
 
         # n step loss
         if self.use_n_step:
             gamma = self.hyper_params.gamma ** self.hyper_params.n_step
 
-            dq_loss_n_element_wise, q_values_n = self.loss_fn(self.dqn, self.dqn_target, experience_n, gamma)
+            dq_loss_n_element_wise, q_values_n = self.loss_fn(self.dqn, self.dqn_target, experience_n, gamma, self.cfg)
 
             # to update loss and priorities
             q_values = 0.5 * (q_values + q_values_n)
@@ -150,24 +150,34 @@ class DQNLearner(Learner):
 
 
 class DQNLoss:
+    def __init__(self, device) -> None:
+        self.device = device
 
     def __call__(
         self,
         model: NeuralNetwork,
         target_model: NeuralNetwork,
         experiences: typing.Tuple[torch.Tensor, ...],
-        gamma: float
+        gamma: float,
+        cfg = None
     ) -> typing.Tuple[torch.Tensor, torch.Tensor]:
         """Return element-wise dqn loss and Q-values."""
         states, actions, rewards, next_states, dones = experiences[:5]
 
-        q_values = model(add_widxheight_dim(states))
-        # According to noisynet paper,
-        # it resamples noisynet parameters on online network when using double q
-        # but we don't because there is no remarkable difference in performance.
-        next_q_values = model(add_widxheight_dim(next_states))
+        if cfg.algo.learner_cfg.head.configs.use_recurrency_layer:
+            batch_size = cfg.algo.hyper_params.batch_size 
+            h, c = model.head.init_lstm_hidden_state(batch_size, training=True)
+            q_values  = model(add_widxheight_dim(states),  h.cuda(), c.cuda() )
+            
+            h, c = model.head.init_lstm_hidden_state(batch_size, training=True)
+            next_q_values = model(add_widxheight_dim(next_states), h.cuda(), c.cuda())
 
-        next_target_q_values = target_model(add_widxheight_dim(next_states))
+            h_target, c_target = target_model.head.init_lstm_hidden_state(batch_size, training=True)
+            next_target_q_values  = target_model(add_widxheight_dim(next_states), h_target.cuda(), c_target.cuda() )
+        else:
+            q_values = model(add_widxheight_dim(states))
+            next_q_values = model(add_widxheight_dim(next_states))
+            next_target_q_values = target_model(add_widxheight_dim(next_states))
 
         curr_q_value = q_values.gather(1, actions.long().unsqueeze(1))
         next_q_value = next_target_q_values.gather(1, next_q_values.argmax(1).unsqueeze(1))

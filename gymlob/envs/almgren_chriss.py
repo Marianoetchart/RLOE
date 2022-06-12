@@ -14,14 +14,14 @@ from gymlob.utils.data.lobster import LOBSTERDataLoader
 
 ANNUAL_VOLAT = 0.12  # Annual volatility in stock price
 BID_ASK_SP = 1 / 8  # Bid-ask spread
-DAILY_TRADE_VOL = 25e6  # Average Daily trading volume
+DAILY_TRADE_VOL = 10000 #25e6  # Average Daily trading volume
 TRAD_DAYS = 250  # Number of trading days in a year
 DAILY_VOLAT = ANNUAL_VOLAT / np.sqrt(TRAD_DAYS)  # Daily volatility in stock price
 
 # ----------------------------- Parameters for the Almgren and Chriss Optimal Execution Model ----------------------- #
 
 LLAMBDA = 1e-6  # Trader's risk aversion
-LIQUIDATION_TIME = 1  # How many days to sell all the shares.
+LIQUIDATION_TIME = 60  # How many days to sell all the shares.
 NUM_N = 60  # Number of trades
 EPSILON = BID_ASK_SP / 2  # Fixed Cost of Selling.
 ETA = BID_ASK_SP / (0.01 * DAILY_TRADE_VOL)  # Price Impact for Each 1% of Daily Volume Traded
@@ -113,7 +113,7 @@ class AlmgrenChrissEnv(gym.Env):
         # store to later do reward normalization
         self.implementation_shortfall_arr = []
         # storing the previous val to compute change in imp shortfall
-        self.prev_implementation_shortfall = 0 
+        self.prev_slippage = 0 
 
         # the accumulated impact across timesteps
         self.PermanentImpact = 0 
@@ -209,6 +209,7 @@ class AlmgrenChrissEnv(gym.Env):
 
         current_ob_snapshot = self.episode_orderbook_df.loc[self.current_time]
         info.price = current_ob_snapshot.mid_price - self.PermanentImpact 
+        self.epsilon = (current_ob_snapshot.spread / 2)
 
         # During training, if the DDPG fails to sell all the stocks before the given
         # number of trades or if the total number shares remaining is less than 1, then stop transacting,
@@ -227,11 +228,13 @@ class AlmgrenChrissEnv(gym.Env):
             info.exec_price = info.price - info.currentTemporaryImpact - info.currentPermanentImpact
 
             # Calculate the current total capture
-            self.totalCapture += info.share_to_sell_now * info.exec_price
+            currentCapture = info.share_to_sell_now * info.exec_price 
+            self.totalCapture += currentCapture
 
             info.implementation_shortfall = self.total_shares * self.startingPrice - self.totalCapture
             self.implementation_shortfall_arr.append(info.implementation_shortfall)
-            reward = self.getReward(info.implementation_shortfall)
+            info.slippage = info.share_to_sell_now * info.price - currentCapture 
+            reward = self.getReward(info.slippage)
 
             info.expected_shortfall = self.get_expected_shortfall(self.total_shares)
             info.expected_variance = self.singleStepVariance * self.tau * self.totalSRSQ
@@ -268,11 +271,12 @@ class AlmgrenChrissEnv(gym.Env):
 
             sharesToSellNow =  int(sum([order[0] for order in step_executed_orders])) 
 
+
             if self.time_remaining < 2:
                 sharesToSellNow = self.shares_remaining
 
             # Since we are not selling fractions of shares, round up the total number of shares to sell to the nearest integer.
-            info.share_to_sell_now = np.around(sharesToSellNow)
+            info.share_to_sell_now = min(np.around(sharesToSellNow), self.shares_remaining)
 
             # Calculate the permanent and temporary impact on the stock price according the AC price dynamics model
             info.currentPermanentImpact = self.permanentImpact(info.share_to_sell_now, current_ob_snapshot.spread)
@@ -281,8 +285,9 @@ class AlmgrenChrissEnv(gym.Env):
             # Apply the temporary and permanent impact on the current stock price
             info.exec_price = info.price - info.currentTemporaryImpact - info.currentPermanentImpact
 
-            # Calculate the current total capture
-            self.totalCapture += info.share_to_sell_now * info.exec_price
+            # Calculate the current total capture            
+            currentCapture = info.share_to_sell_now * info.exec_price 
+            self.totalCapture += currentCapture
 
             # Calculate the log return for the current step and save it in the logReturn deque
             self.logReturns.append(np.log(info.price / self.prevPrice))
@@ -307,11 +312,12 @@ class AlmgrenChrissEnv(gym.Env):
             #currentUtility = self.compute_AC_utility(self.shares_remaining)
             #reward = (abs(self.prevUtility) - abs(currentUtility)) / abs(self.prevUtility)
             info.implementation_shortfall = self.total_shares * self.startingPrice - self.totalCapture
+            info.slippage = info.share_to_sell_now * info.price - currentCapture
             self.implementation_shortfall_arr.append(info.implementation_shortfall)
-            reward = self.getReward(info.implementation_shortfall)
+            reward = self.getReward(info.slippage)
 
             if type(reward) !=  np.float64:
-                print('Error')
+                print('Error') 
 
             self.prevPrice = info.price 
 
@@ -340,7 +346,7 @@ class AlmgrenChrissEnv(gym.Env):
         return (observation , np.array([reward]), info.done, info)
 
 
-    def getReward(self, impShortFall):
+    def getReward(self, slippage):
 
         #mean = np.mean(self.implementation_shortfall_arr)
         #std = np.std(self.implementation_shortfall_arr)
@@ -348,18 +354,18 @@ class AlmgrenChrissEnv(gym.Env):
         #impShortFall = np.float64((impShortFall - mean) / std)
 
         # compute meaninful value of percent change 
-        if self.prev_implementation_shortfall == 0:
-            impShortFallChange = 0 
+        if self.prev_slippage == 0:
+            slippageChange = 0 
         else:
-            impShortFallChange = impShortFall - self.prev_implementation_shortfall / abs(self.prev_implementation_shortfall)
+            slippageChange = slippage - self.prev_slippage / abs(self.prev_slippage)
 
-        self.prev_implementation_shortfall = impShortFall
+        self.prev_slippage = slippage
 
-        impShortFallChange = impShortFallChange * (-1 / 10000)  # inverse so goal is to reduce it 
+        slippageChange = slippageChange * (-1 )  # inverse so goal is to reduce it 
 
         #impShortFallChange = torch.tanh(torch.tensor([impShortFallChange], dtype=torch.float64)).item()
 
-        return np.float64(impShortFallChange)
+        return np.float64(slippageChange)
         
     def permanentImpact(self, sharesToSell, spread):
         # Calculate the permanent impact according to equations (6) and (1) of the AC paper
