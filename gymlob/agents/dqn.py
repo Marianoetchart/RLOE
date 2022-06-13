@@ -4,6 +4,8 @@ import typing
 
 import gym
 import numpy as np
+import pandas as pd 
+import os
 import omegaconf
 import torch
 import wandb
@@ -59,7 +61,7 @@ class DQNAgent(Agent):
             if self.cfg.algo.hyper_params.use_binomial_egreedy:
                 selected_action = np.array(np.random.binomial(quantity_remaining, 1/(time_remaining)))
             else:
-                selected_action = np.array(self.env.action_space.sample())
+                selected_action = np.array( np.random.randint(0,quantity_remaining))
         else:
             with torch.no_grad():
                 state = numpy2floattensor(state, self.learner.device)
@@ -192,5 +194,62 @@ class DQNAgent(Agent):
         self.learner.save_params(self.i_episode)
 
     def test(self):
-        twap_quantity = self.cfg.quantity  / self.cfg.duration 
-        super().test()
+
+        def save_transitions():
+                #TODO: change this
+            demos_folder_path = f"'../../../../../data/{self.cfg.project_name}/{self.cfg.algo.env}/{self.cfg.algo.seed}/"
+            demos_file_path = f"{demos_folder_path}{self.cfg.experiment_name}_demos.pkl"
+            print(f"Saving {len(transitions)} to {demos_file_path}")
+            if os.path.isfile(demos_file_path):
+                existing_demos = pd.read_pickle(demos_file_path)
+                pd.to_pickle(existing_demos + transitions, demos_file_path)
+            else:
+                os.makedirs(demos_folder_path, exist_ok=True)
+                pd.to_pickle(transitions, demos_file_path)
+
+        transitions = []
+        for i_episode in range(self.cfg.num_test_episodes):
+
+            state = self.env.reset()
+            done = False
+            total_reward = 0
+            bm_reward = 0 
+            total_capture= 0
+            slippages = []
+            
+            bm_total_capture= 0
+            step = 0
+
+            while not done:
+                if self.cfg.twap == True:
+                    action = self.cfg.quantity / self.cfg.duration 
+                else:
+                    action = self.select_action(state)
+        
+                next_state, reward, done, state_info = self.step(action)
+
+                total_capture += state_info.totalCapture
+                slippages.append(state_info.slippage)
+
+                transition = (state, action, reward, next_state, done)
+                transitions.append(transition)
+
+                state = next_state
+                total_reward += reward
+                step += 1
+
+            if self.cfg.log_wb:
+                wandb.log(
+                    {
+                        "episode": i_episode,
+                        "test episode num steps": step,
+                        "test episode total reward": total_reward,
+                        "Implementation Shortfall" :  state_info.implementation_shortfall,
+                        "P&L": total_capture,
+                        "Avg Slippage": statistics.mean(slippages),
+                        
+                    }
+                )
+
+        if self.cfg.save_test_episodes:
+            save_transitions()

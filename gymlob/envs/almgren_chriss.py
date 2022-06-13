@@ -112,6 +112,7 @@ class AlmgrenChrissEnv(gym.Env):
 
         # store to later do reward normalization
         self.implementation_shortfall_arr = []
+        self.slippage_arr = [] 
         # storing the previous val to compute change in imp shortfall
         self.prev_slippage = 0 
 
@@ -151,11 +152,11 @@ class AlmgrenChrissEnv(gym.Env):
         self.current_time = self.start_time
         self.time_remaining = self.client_order_info['duration']
         self.quantity_remaining = self.client_order_info['quantity']
-        self.startingPrice = self.episode_orderbook_df.loc[self.current_time].mid_price
 
         self.executed_orders = []
         self.PermanentImpact = 0 
         self.implementation_shortfall_arr = []
+        self.slippage_arr = []
         self.step_num = 1
 
         self.start_transactions()
@@ -230,10 +231,12 @@ class AlmgrenChrissEnv(gym.Env):
             # Calculate the current total capture
             currentCapture = info.share_to_sell_now * info.exec_price 
             self.totalCapture += currentCapture
+            info.totalCapture = self.totalCapture
 
             info.implementation_shortfall = self.total_shares * self.startingPrice - self.totalCapture
             self.implementation_shortfall_arr.append(info.implementation_shortfall)
             info.slippage = info.share_to_sell_now * info.price - currentCapture 
+            self.slippage_arr.append(info.slippage)
             reward = self.getReward(info.slippage)
 
             info.expected_shortfall = self.get_expected_shortfall(self.total_shares)
@@ -288,6 +291,7 @@ class AlmgrenChrissEnv(gym.Env):
             # Calculate the current total capture            
             currentCapture = info.share_to_sell_now * info.exec_price 
             self.totalCapture += currentCapture
+            info.totalCapture = self.totalCapture
 
             # Calculate the log return for the current step and save it in the logReturn deque
             self.logReturns.append(np.log(info.price / self.prevPrice))
@@ -313,6 +317,7 @@ class AlmgrenChrissEnv(gym.Env):
             #reward = (abs(self.prevUtility) - abs(currentUtility)) / abs(self.prevUtility)
             info.implementation_shortfall = self.total_shares * self.startingPrice - self.totalCapture
             info.slippage = info.share_to_sell_now * info.price - currentCapture
+            self.slippage_arr.append(info.slippage)
             self.implementation_shortfall_arr.append(info.implementation_shortfall)
             reward = self.getReward(info.slippage)
 
@@ -348,24 +353,24 @@ class AlmgrenChrissEnv(gym.Env):
 
     def getReward(self, slippage):
 
-        #mean = np.mean(self.implementation_shortfall_arr)
-        #std = np.std(self.implementation_shortfall_arr)
-        #if std == 0:std = 1
-        #impShortFall = np.float64((impShortFall - mean) / std)
+        mean = np.mean(self.slippage_arr)
+        std = np.std(self.slippage_arr)
+        if std == 0:std = 1
+        slippage = np.float64((slippage - mean) / std)
 
         # compute meaninful value of percent change 
-        if self.prev_slippage == 0:
-            slippageChange = 0 
-        else:
-            slippageChange = slippage - self.prev_slippage / abs(self.prev_slippage)
+        #if self.prev_slippage == 0:
+        #    slippageChange = 0 
+        #else:
+        #    slippageChange = slippage - self.prev_slippage / abs(self.prev_slippage)
 
-        self.prev_slippage = slippage
+        #self.prev_slippage = slippage
 
-        slippageChange = slippageChange * (-1 )  # inverse so goal is to reduce it 
+        slippage= slippage * (-1 )  # inverse so goal is to reduce it 
 
-        #impShortFallChange = torch.tanh(torch.tensor([impShortFallChange], dtype=torch.float64)).item()
+        slippage = torch.tanh(torch.tensor([slippage], dtype=torch.float64)).item()
 
-        return np.float64(slippageChange)
+        return np.float64(slippage)
         
     def permanentImpact(self, sharesToSell, spread):
         # Calculate the permanent impact according to equations (6) and (1) of the AC paper

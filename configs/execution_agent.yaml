@@ -3,13 +3,17 @@ project_name: "rlob"
 seeds: [5422608]
 log_cmd: False
 log_wb: True
-test: False
+test: True
+save_test_episodes: True
+twap: False
 num_experiments_in_parallel: 1
-experiment_name: "LSTM_4_LR1_random"
+experiment_name: "TEST:LSTM_4_LR2_random_reward"
  
 # data config
 orderbook_file_path: "/home/paperspace/Documents/RLOE/TSLA_2015-01-05_34200000_57600000_orderbook_10.csv"
 orders_file_path: "/home/paperspace/Documents/RLOE/TSLA_2015-01-05_34200000_57600000_message_10.csv"
+
+load_params_from: "/home/paperspace/Documents/RLOE/scripts/checkpoint/rlob/LSTM_4_LR2_random_reward/ep_45000.pt"
 
 # client order information
 instrument: "TSLA"
@@ -21,6 +25,7 @@ duration: 60
 benchmark: "arrival"
 
 num_train_episodes: 20000000000
+num_test_episodes: 20000
 save_params_every: 1000 # in episodes
 log_freq: 50
 
